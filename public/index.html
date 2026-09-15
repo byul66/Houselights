@@ -225,6 +225,23 @@
 </footer>
 
 <script>
+  var isRestoringHistory = false;
+
+  function urlForView(name, slug) {
+    if (name === 'country') return '/country/' + encodeURIComponent(slug);
+    if (name === 'movie') return '/movie/' + encodeURIComponent(slug);
+    return '/';
+  }
+
+  function parseLocation() {
+    var path = window.location.pathname;
+    var countryMatch = path.match(/^\/country\/([^\/]+)$/);
+    if (countryMatch) return { name: 'country', slug: decodeURIComponent(countryMatch[1]) };
+    var movieMatch = path.match(/^\/movie\/([^\/]+)$/);
+    if (movieMatch) return { name: 'movie', slug: decodeURIComponent(movieMatch[1]) };
+    return { name: 'home', slug: null };
+  }
+
   function showView(name, slug) {
     document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('show'); });
     document.getElementById('view-'+name).classList.add('show');
@@ -232,7 +249,18 @@
     window.scrollTo(0,0);
     if (name === 'country') renderCountry(slug);
     if (name === 'movie') renderMovie(slug);
+
+    if (!isRestoringHistory) {
+      history.pushState({ name: name, slug: slug }, '', urlForView(name, slug));
+    }
   }
+
+  window.addEventListener('popstate', function(e){
+    isRestoringHistory = true;
+    var state = e.state || parseLocation();
+    showView(state.name, state.slug);
+    isRestoringHistory = false;
+  });
   function switchTab(scope, group, el) {
     document.querySelectorAll('.tabs[data-scope="'+scope+'"] .tab').forEach(function(b){ b.classList.toggle('active', b===el); });
     document.querySelectorAll('.list-panel[data-scope="'+scope+'"]').forEach(function(p){ p.classList.toggle('show', p.getAttribute('data-group')===group); });
@@ -1127,6 +1155,14 @@
   document.addEventListener('click', function(e){
     if (!e.target.closest('.search-wrap')) document.getElementById('dropdown').classList.remove('show');
   });
+
+  (function initFromUrl(){
+    var initial = parseLocation();
+    isRestoringHistory = true;
+    showView(initial.name, initial.slug);
+    isRestoringHistory = false;
+    history.replaceState({ name: initial.name, slug: initial.slug }, '', urlForView(initial.name, initial.slug));
+  })();
 </script>
 
 </body>

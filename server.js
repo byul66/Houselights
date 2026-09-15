@@ -190,6 +190,12 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// SPA fallback: client-side routes like /country/thailand or /movie/parasite aren't
+// real files, so serve the app shell and let the front-end JS render the right view.
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 app.listen(PORT, () => {
   console.log(`Houselights running at http://localhost:${PORT}`);
   if (!TMDB_API_KEY) console.log('  TMDB_API_KEY not set — posters will fall back to placeholders.');
