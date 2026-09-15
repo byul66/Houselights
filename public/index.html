@@ -119,6 +119,19 @@
 
   .poster-note { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
 
+  .row-providers { display: flex; gap: 4px; margin-top: 4px; }
+  .row-providers img { width: 18px; height: 18px; border-radius: 4px; display: block; }
+
+  .watch-box { margin-top: 20px; max-width: 480px; }
+  .watch-box h3 { font-size: 13px; margin: 0 0 10px; color: var(--text-muted); font-weight: 600; }
+  .watch-providers { display: flex; gap: 10px; flex-wrap: wrap; }
+  .watch-provider { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; text-decoration: none; color: var(--text); font-size: 13px; transition: border-color 0.15s ease; }
+  .watch-provider:hover { border-color: var(--teal-dim); }
+  .watch-provider img { width: 24px; height: 24px; border-radius: 5px; display: block; }
+  .watch-attribution { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+  .watch-attribution a { color: var(--text-muted); }
+  .watch-attribution a:hover { color: var(--teal); }
+
   footer { border-top: 1px solid var(--border); padding: 24px 0 40px; position: relative; z-index: 2; }
   footer .wrap { font-size: 12px; color: var(--text-muted); }
   footer a { color: var(--text-muted); text-decoration: underline; }
@@ -208,6 +221,11 @@
         <div class="score"><b id="scoreValue">&mdash;</b> IMDb<span class="score-note" id="scoreNote"></span></div>
         <div class="badges" id="movieBadges"></div>
         <div class="stats" id="movieStats"></div>
+        <div class="watch-box" id="watchBox" style="display:none">
+          <h3>Watch on</h3>
+          <div class="watch-providers" id="watchProviders"></div>
+          <div class="watch-attribution">Streaming availability data from <a href="https://www.justwatch.com/" target="_blank" rel="noopener">JustWatch</a>, U.S. region.</div>
+        </div>
         <div class="recog-box">
           <h3>Awards recognition</h3>
           <div id="movieAwards"></div>
@@ -285,6 +303,12 @@
       '<div class="right"><span class="n">'+item.v+'</span>'+(item.note?'<div class="note">'+item.note+'</div>':'')+'</div></div>';
   }
 
+  function providersHTML(providers) {
+    if (!providers || !providers.length) return '';
+    return '<div class="row-providers">' + providers.map(function(p){
+      return p.logoUrl ? '<img src="'+p.logoUrl+'" alt="'+p.name+'" title="'+p.name+'">' : '';
+    }).join('') + '</div>';
+  }
   function imdbRowHTML(item) {
     var link = 'tmdb:' + item.id;
     var crew = [
@@ -296,6 +320,7 @@
       '<div class="info"><div class="t">'+item.title+'</div>'+
         '<div class="y">'+item.year+(item.country ? ' · '+item.country : '')+'</div>'+
         (crew ? '<div class="y">'+crew+'</div>' : '')+
+        providersHTML(item.providers)+
       '</div>'+
       '<div class="right"><span class="n">'+item.imdbRating+'</span></div></div>';
   }
@@ -309,7 +334,7 @@
     var panel = document.getElementById('panel-global-imdb');
     if (reset) panel.innerHTML = '<div class="gap-note">Loading…</div>';
     fetch('/api/top-imdb?page=' + imdbPage)
-      .then(function(r){ return r.json(); })
+      .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function(data){
         // Re-sort the whole accumulated set each time — TMDB's own ranking (what we're
         // paginating through) doesn't line up perfectly with IMDb's, so sorting only
@@ -319,6 +344,10 @@
         panel.innerHTML = imdbResults.map(imdbRowHTML).join('');
         if (data.reason) {
           panel.insertAdjacentHTML('beforeend', '<div class="gap-note">'+data.reason+'</div>');
+        } else if (!data.results || !data.results.length) {
+          // This fetched page had nothing clear 7.0 — treat as the real end rather than
+          // keep offering "View more" just because TMDB still has more raw pages.
+          panel.insertAdjacentHTML('beforeend', '<div class="gap-note">Sourced from TMDB’s top-rated catalog (1,000+ votes), cross-checked against real IMDb scores — only titles that clear 7.0 are shown.</div>');
         } else if (data.page < data.totalPages) {
           panel.insertAdjacentHTML('beforeend', '<div class="view-more" onclick="loadMoreImdb()">View more</div>');
         } else {
@@ -326,10 +355,22 @@
         }
         imdbLoading = false;
       })
-      .catch(function(){ imdbLoading = false; });
+      .catch(function(){
+        imdbLoading = false;
+        panel.insertAdjacentHTML('beforeend', '<div class="view-more" onclick="retryImdb()">Couldn’t load more — tap to retry</div>');
+      });
   }
   function loadMoreImdb() {
+    var panel = document.getElementById('panel-global-imdb');
+    var existingMore = panel.querySelector('.view-more');
+    if (existingMore) existingMore.remove();
     imdbPage++;
+    loadTopImdb(false);
+  }
+  function retryImdb() {
+    var panel = document.getElementById('panel-global-imdb');
+    var existingMore = panel.querySelector('.view-more');
+    if (existingMore) existingMore.remove();
     loadTopImdb(false);
   }
 
@@ -368,6 +409,7 @@
             data.cast && data.cast.length ? data.cast.join(', ') : null
           ].filter(Boolean).join(' · ');
           if (crew && infoEl) infoEl.insertAdjacentHTML('beforeend', '<div class="y">'+crew+'</div>');
+          if (infoEl) infoEl.insertAdjacentHTML('beforeend', providersHTML(data.providers));
         })
         .catch(function(){});
     });
@@ -427,7 +469,18 @@
     document.getElementById('movieAwards').innerHTML = m.awards.map(function(a){
       return '<div class="recog-row"><span class="k">'+a.k+'</span><span>'+a.v+'</span></div>';
     }).join('');
+    document.getElementById('watchBox').style.display = 'none';
     enrichMoviePage(m);
+  }
+
+  function renderWatchBox(watch) {
+    var box = document.getElementById('watchBox');
+    if (!watch || !watch.providers || !watch.providers.length) { box.style.display = 'none'; return; }
+    box.style.display = '';
+    document.getElementById('watchProviders').innerHTML = watch.providers.map(function(p){
+      var logo = p.logoUrl ? '<img src="'+p.logoUrl+'" alt="'+p.name+'">' : '';
+      return '<a class="watch-provider" href="'+(watch.link || '#')+'" target="_blank" rel="noopener">'+logo+'<span>'+p.name+'</span></a>';
+    }).join('');
   }
 
   function enrichMoviePage(movie) {
@@ -456,6 +509,8 @@
         } else if (data.imdb) {
           scoreNoteEl.textContent = data.imdb.reason;
         }
+
+        renderWatchBox(data.watch);
       })
       .catch(function(err){
         console.warn('movie-data fetch failed', err);
@@ -488,6 +543,7 @@
     document.getElementById('movieBadges').innerHTML = '';
     document.getElementById('movieStats').innerHTML = '';
     document.getElementById('movieAwards').innerHTML = '';
+    document.getElementById('watchBox').style.display = 'none';
 
     var url = query.id
       ? '/api/movie-details?id=' + encodeURIComponent(query.id)
@@ -548,6 +604,8 @@
         document.getElementById('movieAwards').innerHTML = query.knownRecognition
           ? '<div class="recog-row"><span class="k">Recognition</span><span>'+query.knownRecognition+'</span></div>'
           : '<div class="recog-row"><span class="k">Recognition</span><span>Not independently researched for this title yet — shown once verified, not filled with placeholders.</span></div>';
+
+        renderWatchBox(data.watch);
       })
       .catch(function(){
         document.getElementById('movieTitle').textContent = 'Could not load this film';

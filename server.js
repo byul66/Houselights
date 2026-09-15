@@ -66,8 +66,11 @@ app.get('/api/movie-data', async (req, res) => {
     lookupTmdbPoster(title, year).catch((err) => ({ url: null, reason: err.message })),
     lookupOmdbRating(title, year).catch((err) => ({ rating: null, reason: err.message }))
   ]);
+  const watch = poster.tmdbId
+    ? await getWatchProviders(poster.tmdbId).catch(() => ({ providers: [], link: null }))
+    : { providers: [], link: null };
 
-  const result = { poster, imdb };
+  const result = { poster, imdb, watch };
   cache.set(cacheKey, result);
   res.json(result);
 });
@@ -101,10 +104,13 @@ app.get('/api/poster', async (req, res) => {
     return res.json(result);
   }
 
-  const t = await getTmdbDetails(match.id).catch(() => null);
+  const [t, watch] = await Promise.all([
+    getTmdbDetails(match.id).catch(() => null),
+    getWatchProviders(match.id).catch(() => ({ providers: [], link: null }))
+  ]);
   const result = t
-    ? { url: t.posterThumbUrl, director: t.director, cast: t.cast, country: t.country }
-    : { url: null, director: null, cast: [], reason: 'TMDB detail request failed' };
+    ? { url: t.posterThumbUrl, director: t.director, cast: t.cast, country: t.country, providers: watch.providers }
+    : { url: null, director: null, cast: [], providers: [], reason: 'TMDB detail request failed' };
   cache.set(cacheKey, result);
   res.json(result);
 });
@@ -148,6 +154,34 @@ async function getTmdbDetails(id) {
   return result;
 }
 
+// "Where to watch" data comes from JustWatch via TMDB. TMDB does not provide a direct
+// deep link into e.g. Netflix's own page for a title — only its own aggregator "watch"
+// page, which itself links out to each provider. Region defaults to US since the site
+// has no geo-detection; JustWatch attribution is required per-title per their terms.
+const WATCH_REGION = 'US';
+
+async function getWatchProviders(id) {
+  const cacheKey = `providers:${id}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+  const res = await fetch(`https://api.themoviedb.org/3/movie/${id}/watch/providers?api_key=${TMDB_API_KEY}`).catch(() => null);
+  if (!res || !res.ok) return { providers: [], link: null };
+  const data = await res.json();
+  const regionData = data.results && data.results[WATCH_REGION];
+  if (!regionData) return { providers: [], link: null };
+
+  const flatrate = regionData.flatrate || [];
+  const result = {
+    providers: flatrate.map((p) => ({
+      name: p.provider_name,
+      logoUrl: p.logo_path ? `https://image.tmdb.org/t/p/w45${p.logo_path}` : null
+    })),
+    link: regionData.link || null
+  };
+  cache.set(cacheKey, result);
+  return result;
+}
+
 app.get('/api/top-imdb', async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   if (!TMDB_API_KEY) {
@@ -181,6 +215,7 @@ app.get('/api/top-imdb', async (req, res) => {
     if (!t) return null;
     const imdb = await lookupOmdbRating(t.title, t.year).catch(() => ({ rating: null }));
     if (!imdb.rating || parseFloat(imdb.rating) < 7.0) return null;
+    const watch = await getWatchProviders(m.id).catch(() => ({ providers: [] }));
     return {
       id: t.id,
       title: t.title,
@@ -189,7 +224,8 @@ app.get('/api/top-imdb', async (req, res) => {
       director: t.director,
       cast: t.cast,
       posterUrl: t.posterThumbUrl,
-      imdbRating: imdb.rating
+      imdbRating: imdb.rating,
+      providers: watch.providers
     };
   }));
 
@@ -251,8 +287,11 @@ app.get('/api/movie-details', async (req, res) => {
   if (!t) {
     return res.status(502).json({ tmdb: null, imdb: null, reason: 'TMDB detail request failed' });
   }
-  const imdb = await lookupOmdbRating(t.title, t.year).catch((err) => ({ rating: null, reason: err.message }));
-  res.json({ tmdb: t, imdb });
+  const [imdb, watch] = await Promise.all([
+    lookupOmdbRating(t.title, t.year).catch((err) => ({ rating: null, reason: err.message })),
+    getWatchProviders(resolvedId).catch(() => ({ providers: [], link: null }))
+  ]);
+  res.json({ tmdb: t, imdb, watch });
 });
 
 app.get('/api/health', (req, res) => {
