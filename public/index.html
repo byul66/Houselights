@@ -359,6 +359,10 @@
         .then(function(r){ return r.json(); })
         .then(function(data){
           if (data.url) posterEl.style.backgroundImage = 'url(' + data.url + ')';
+          if (data.country && !item.c && infoEl) {
+            var yearEl = infoEl.querySelector('.y');
+            if (yearEl) yearEl.textContent = yearEl.textContent + ' · ' + data.country;
+          }
           var crew = [
             data.director ? ('Dir. ' + data.director) : null,
             data.cast && data.cast.length ? data.cast.join(', ') : null
