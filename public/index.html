@@ -386,9 +386,9 @@
     }
     if (gapNote) html += '<div class="gap-note">'+gapNote+'</div>';
     document.getElementById(id).innerHTML = html;
-    enrichRowPosters(id, visible.concat(rest));
+    enrichRowPosters(id, visible.concat(rest), kind);
   }
-  function enrichRowPosters(id, items) {
+  function enrichRowPosters(id, items, kind) {
     var rows = document.querySelectorAll('#'+id+' .film-row');
     rows.forEach(function(rowEl, i){
       var item = items[i];
@@ -400,7 +400,11 @@
         .then(function(r){ return r.json(); })
         .then(function(data){
           if (data.url) posterEl.style.backgroundImage = 'url(' + data.url + ')';
-          if (data.country && !item.c && infoEl) {
+          // Country lists (kind is set) already establish their country via page context —
+          // TMDB's production_countries[0] for a co-production can be an arbitrary partner
+          // country (e.g. Apache Gold, a German Karl May film, listed under France by TMDB),
+          // so only fill in the fetched country on home-page lists that span countries.
+          if (!kind && data.country && !item.c && infoEl) {
             var yearEl = infoEl.querySelector('.y');
             if (yearEl) yearEl.textContent = yearEl.textContent + ' · ' + data.country;
           }
