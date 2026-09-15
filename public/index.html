@@ -591,11 +591,12 @@
         }
 
         var hasFinancials = t.budget > 0 && t.revenue > 0;
+        var revenueCaveat = "as reported by TMDB — may reflect only the original theatrical run, not later re-releases";
         var stats = [
           { label: "Domestic box office (" + country + ")", value: "Not available", sub: "not reported per-country by TMDB or OMDb" },
-          { label: "Worldwide box office", value: t.revenue ? fmtMoney(t.revenue) : "Not available via TMDB" },
+          { label: "Worldwide box office", value: t.revenue ? fmtMoney(t.revenue) : "Not available via TMDB", sub: t.revenue ? revenueCaveat : null },
           { label: "Budget", value: t.budget ? fmtMoney(t.budget) : "Not available via TMDB" },
-          { label: "Revenue to budget", value: hasFinancials ? (t.revenue / t.budget).toFixed(1) + '×' : "Not available", sub: hasFinancials ? "gross revenue, not profit" : null }
+          { label: "Revenue to budget", value: hasFinancials ? (t.revenue / t.budget).toFixed(1) + '×' : "Not available", sub: hasFinancials ? "gross revenue not profit — " + revenueCaveat : null }
         ];
         document.getElementById('movieStats').innerHTML = stats.map(function(s){
           return '<div class="stat"><div class="label">'+s.label+'</div><div class="value">'+s.value+'</div>'+(s.sub?'<div class="sub">'+s.sub+'</div>':'')+'</div>';
