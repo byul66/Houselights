@@ -110,6 +110,8 @@
   .poster .init { position: absolute; bottom: 14px; left: 14px; font-size: 13px; color: rgba(255,255,255,0.55); letter-spacing: 0.5px; }
   .meta-line { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; }
   .title { font-size: 27px; font-weight: 700; line-height: 1.2; margin: 0 0 14px; max-width: 460px; }
+  .share-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--border); color: var(--text-muted); font-family: inherit; font-size: 12px; padding: 6px 12px; border-radius: 20px; cursor: pointer; margin-bottom: 18px; transition: border-color 0.15s ease, color 0.15s ease; }
+  .share-btn:hover { border-color: var(--teal-dim); color: var(--teal); }
   .score { display: inline-flex; align-items: baseline; gap: 6px; font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
   .score b { font-size: 18px; color: var(--teal); font-weight: 700; }
   .score .score-note { font-size: 11px; color: var(--text-muted); margin-left: 4px; }
@@ -228,6 +230,10 @@
       <div>
         <div class="meta-line" id="movieMeta"></div>
         <h1 class="title" id="movieTitle"></h1>
+        <button class="share-btn" id="shareBtn" onclick="shareMovie()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          <span id="shareBtnLabel">Share</span>
+        </button>
         <div class="score"><b id="scoreValue">&mdash;</b> IMDb<span class="score-note" id="scoreNote"></span></div>
         <div class="badges" id="movieBadges"></div>
         <div class="stats" id="movieStats"></div>
@@ -435,6 +441,25 @@
 
   function movieInitials(title) {
     return title.split(' ').filter(function(w){return w.length>2;}).slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();
+  }
+
+  function shareMovie() {
+    var title = document.getElementById('movieTitle').textContent;
+    var url = window.location.href;
+    var label = document.getElementById('shareBtnLabel');
+    if (navigator.share) {
+      navigator.share({ title: title + ' — Houselights', url: url }).catch(function(){});
+      return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function(){
+        var original = label.textContent;
+        label.textContent = 'Copied!';
+        setTimeout(function(){ label.textContent = original; }, 2000);
+      }).catch(function(){ window.prompt('Copy this link:', url); });
+      return;
+    }
+    window.prompt('Copy this link:', url);
   }
 
   function renderCountry(slug) {
