@@ -110,8 +110,18 @@
   .poster .init { position: absolute; bottom: 14px; left: 14px; font-size: 13px; color: rgba(255,255,255,0.55); letter-spacing: 0.5px; }
   .meta-line { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; }
   .title { font-size: 27px; font-weight: 700; line-height: 1.2; margin: 0 0 14px; max-width: 460px; }
-  .share-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--border); color: var(--text-muted); font-family: inherit; font-size: 12px; padding: 6px 12px; border-radius: 20px; cursor: pointer; margin-bottom: 18px; transition: border-color 0.15s ease, color 0.15s ease; }
+  .share-wrap { position: relative; display: inline-block; margin-bottom: 18px; }
+  .share-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--border); color: var(--text-muted); font-family: inherit; font-size: 12px; padding: 6px 12px; border-radius: 20px; cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease; }
   .share-btn:hover { border-color: var(--teal-dim); color: var(--teal); }
+  .share-menu {
+    position: absolute; top: calc(100% + 6px); left: 0; min-width: 160px; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 6px; overflow: hidden; display: none; z-index: 20;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+  }
+  .share-menu.show { display: block; }
+  .share-menu-item { padding: 10px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border); }
+  .share-menu-item:last-child { border-bottom: none; }
+  .share-menu-item:hover { background: var(--surface); color: var(--teal); }
   .score { display: inline-flex; align-items: baseline; gap: 6px; font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
   .score b { font-size: 18px; color: var(--teal); font-weight: 700; }
   .score .score-note { font-size: 11px; color: var(--text-muted); margin-left: 4px; }
@@ -230,10 +240,18 @@
       <div>
         <div class="meta-line" id="movieMeta"></div>
         <h1 class="title" id="movieTitle"></h1>
-        <button class="share-btn" id="shareBtn" onclick="shareMovie()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-          <span id="shareBtnLabel">Share</span>
-        </button>
+        <div class="share-wrap">
+          <button class="share-btn" id="shareBtn" onclick="toggleShareMenu(event)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            <span id="shareBtnLabel">Share</span>
+          </button>
+          <div class="share-menu" id="shareMenu">
+            <div class="share-menu-item" onclick="shareTo('whatsapp')">WhatsApp</div>
+            <div class="share-menu-item" onclick="shareTo('line')">LINE</div>
+            <div class="share-menu-item" onclick="shareTo('x')">X (Twitter)</div>
+            <div class="share-menu-item" onclick="shareTo('copy')">Copy link</div>
+          </div>
+        </div>
         <div class="score"><b id="scoreValue">&mdash;</b> IMDb<span class="score-note" id="scoreNote"></span></div>
         <div class="badges" id="movieBadges"></div>
         <div class="stats" id="movieStats"></div>
@@ -443,23 +461,41 @@
     return title.split(' ').filter(function(w){return w.length>2;}).slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();
   }
 
-  function shareMovie() {
+  function toggleShareMenu(e) {
+    e.stopPropagation();
+    document.getElementById('shareMenu').classList.toggle('show');
+  }
+  document.addEventListener('click', function(e){
+    if (!e.target.closest('.share-wrap')) {
+      var menu = document.getElementById('shareMenu');
+      if (menu) menu.classList.remove('show');
+    }
+  });
+
+  function shareTo(platform) {
+    document.getElementById('shareMenu').classList.remove('show');
     var title = document.getElementById('movieTitle').textContent;
     var url = window.location.href;
-    var label = document.getElementById('shareBtnLabel');
-    if (navigator.share) {
-      navigator.share({ title: title + ' — Houselights', url: url }).catch(function(){});
-      return;
+    var text = title + ' — Houselights';
+
+    if (platform === 'whatsapp') {
+      window.open('https://wa.me/?text=' + encodeURIComponent(text + '\n' + url), '_blank', 'noopener,noreferrer');
+    } else if (platform === 'line') {
+      window.open('https://social-plugins.line.me/lineit/share?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text), '_blank', 'noopener,noreferrer');
+    } else if (platform === 'x') {
+      window.open('https://twitter.com/intent/tweet?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text), '_blank', 'noopener,noreferrer');
+    } else if (platform === 'copy') {
+      var label = document.getElementById('shareBtnLabel');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function(){
+          var original = label.textContent;
+          label.textContent = 'Copied!';
+          setTimeout(function(){ label.textContent = original; }, 2000);
+        }).catch(function(){ window.prompt('Copy this link:', url); });
+      } else {
+        window.prompt('Copy this link:', url);
+      }
     }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(function(){
-        var original = label.textContent;
-        label.textContent = 'Copied!';
-        setTimeout(function(){ label.textContent = original; }, 2000);
-      }).catch(function(){ window.prompt('Copy this link:', url); });
-      return;
-    }
-    window.prompt('Copy this link:', url);
   }
 
   function renderCountry(slug) {
