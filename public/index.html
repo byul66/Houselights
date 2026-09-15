@@ -1056,28 +1056,42 @@
     clearTimeout(searchDebounce);
     if (val.length < 2) return;
     searchDebounce = setTimeout(function(){
+      // Curated matches are enriched by looking each one up directly by its own title —
+      // relying on them showing up in the general search below isn't reliable, since TMDB's
+      // relevance ranking for the raw query text won't always surface them in the top few.
+      var curatedEnrichPromise = Promise.all(curatedMatches.map(function(c){
+        return fetch('/api/movie-details?title=' + encodeURIComponent(c.t))
+          .then(function(r){ return r.json(); })
+          .then(function(data){
+            var t = data.tmdb;
+            return t
+              ? { title: c.t, year: t.year, country: t.country, director: t.director, cast: t.cast, posterThumbUrl: t.posterThumbUrl, link: c.link }
+              : { title: c.t, year: null, country: null, director: null, cast: [], posterThumbUrl: null, link: c.link };
+          })
+          .catch(function(){ return { title: c.t, year: null, country: null, director: null, cast: [], posterThumbUrl: null, link: c.link }; });
+      }));
+
       // Not restricted to any one language — searches every TMDB title, including native-script queries
       // (e.g. "올드보이" matches Oldboy), so this scales to every country as more get curated.
-      fetch('/api/search-movies?q=' + encodeURIComponent(val))
+      var liveSearchPromise = fetch('/api/search-movies?q=' + encodeURIComponent(val))
         .then(function(r){ return r.json(); })
-        .then(function(data){
-          var live = (data.results || []).map(function(m){
-            var curatedSlug = findCuratedSlugByTitle(m.title);
-            return {
-              title: m.title, year: m.year, country: m.country, director: m.director, cast: m.cast,
-              posterThumbUrl: m.posterThumbUrl, link: curatedSlug || ('tmdb:' + m.id)
-            };
-          });
-          var curatedEnriched = curatedMatches.map(function(c){
-            var liveMatch = live.filter(function(l){ return l.title.toLowerCase() === c.t.toLowerCase(); })[0];
-            return liveMatch || { title: c.t, year: null, country: null, director: null, cast: [], posterThumbUrl: null, link: c.link };
-          });
-          var rest = live.filter(function(l){
-            return !curatedEnriched.some(function(c){ return c.title.toLowerCase() === l.title.toLowerCase(); });
-          });
-          renderDropdown(curatedEnriched.concat(rest).slice(0, 8));
-        })
-        .catch(function(){});
+        .then(function(data){ return data.results || []; })
+        .catch(function(){ return []; });
+
+      Promise.all([curatedEnrichPromise, liveSearchPromise]).then(function(pair){
+        var curatedEnriched = pair[0];
+        var live = pair[1].map(function(m){
+          var curatedSlug = findCuratedSlugByTitle(m.title);
+          return {
+            title: m.title, year: m.year, country: m.country, director: m.director, cast: m.cast,
+            posterThumbUrl: m.posterThumbUrl, link: curatedSlug || ('tmdb:' + m.id)
+          };
+        });
+        var rest = live.filter(function(l){
+          return !curatedEnriched.some(function(c){ return c.title.toLowerCase() === l.title.toLowerCase(); });
+        });
+        renderDropdown(curatedEnriched.concat(rest).slice(0, 8));
+      });
     }, 300);
   }
   function renderDropdown(matches) {
