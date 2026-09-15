@@ -284,6 +284,55 @@
       '<div class="info"><div class="t">'+item.t+'</div><div class="y">'+item.y+(item.c?' &middot; '+item.c:'')+'</div></div>'+
       '<div class="right"><span class="n">'+item.v+'</span>'+(item.note?'<div class="note">'+item.note+'</div>':'')+'</div></div>';
   }
+
+  function imdbRowHTML(item) {
+    var link = 'tmdb:' + item.id;
+    var crew = [
+      item.director ? ('Dir. ' + item.director) : null,
+      item.cast && item.cast.length ? item.cast.join(', ') : null
+    ].filter(Boolean).join(' · ');
+    return '<div class="film-row clickable" onclick="showView(\'movie\',\''+link+'\')">'+
+      '<div class="row-poster" style="'+(item.posterUrl ? 'background-image:url('+item.posterUrl+')' : '')+'"></div>'+
+      '<div class="info"><div class="t">'+item.title+'</div>'+
+        '<div class="y">'+item.year+(item.country ? ' · '+item.country : '')+'</div>'+
+        (crew ? '<div class="y">'+crew+'</div>' : '')+
+      '</div>'+
+      '<div class="right"><span class="n">'+item.imdbRating+'</span></div></div>';
+  }
+  var imdbPage = 1;
+  var imdbLoading = false;
+  var imdbResults = [];
+  function loadTopImdb(reset) {
+    if (imdbLoading) return;
+    imdbLoading = true;
+    if (reset) { imdbPage = 1; imdbResults = []; }
+    var panel = document.getElementById('panel-global-imdb');
+    if (reset) panel.innerHTML = '<div class="gap-note">Loading…</div>';
+    fetch('/api/top-imdb?page=' + imdbPage)
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        // Re-sort the whole accumulated set each time — TMDB's own ranking (what we're
+        // paginating through) doesn't line up perfectly with IMDb's, so sorting only
+        // within each fetched page would let scores dip and jump back up across pages.
+        imdbResults = imdbResults.concat(data.results || []);
+        imdbResults.sort(function(a,b){ return parseFloat(b.imdbRating) - parseFloat(a.imdbRating); });
+        panel.innerHTML = imdbResults.map(imdbRowHTML).join('');
+        if (data.reason) {
+          panel.insertAdjacentHTML('beforeend', '<div class="gap-note">'+data.reason+'</div>');
+        } else if (data.page < data.totalPages) {
+          panel.insertAdjacentHTML('beforeend', '<div class="view-more" onclick="loadMoreImdb()">View more</div>');
+        } else {
+          panel.insertAdjacentHTML('beforeend', '<div class="gap-note">Sourced from TMDB’s top-rated catalog (1,000+ votes), cross-checked against real IMDb scores — only titles that clear 7.0 are shown.</div>');
+        }
+        imdbLoading = false;
+      })
+      .catch(function(){ imdbLoading = false; });
+  }
+  function loadMoreImdb() {
+    imdbPage++;
+    loadTopImdb(false);
+  }
+
   function renderList(id, items, gapNote, limit, kind) {
     limit = limit || 15;
     var visible = items.slice(0, limit);
@@ -1059,7 +1108,7 @@
 
   renderList('panel-global-box', data.globalBox, null, 20);
   renderList('panel-global-thisweek', data.globalThisWeek, "Weekend of Sep 4, 2026 — the most recent full weekend chart sourced. A live build would refresh this automatically.");
-  renderList('panel-global-imdb', data.globalImdb, null, 20);
+  loadTopImdb(true);
   renderList('panel-global-picture', data.globalPicture, null, 20);
   renderList('panel-global-palme', data.globalPalme, null, 20);
   renderList('panel-global-lion', data.globalLion, "2009–2017 and 2024 aren't independently verified yet — shown once sourced, not filled with placeholders.");

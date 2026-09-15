@@ -127,6 +127,57 @@ async function getTmdbDetails(id) {
   return result;
 }
 
+app.get('/api/top-imdb', async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  if (!TMDB_API_KEY) {
+    return res.json({ results: [], reason: 'TMDB_API_KEY not configured' });
+  }
+
+  const cacheKey = `top-imdb:${page}`;
+  if (cache.has(cacheKey)) {
+    return res.json(cache.get(cacheKey));
+  }
+
+  // TMDB has no "sort by IMDb rating" endpoint (OMDb only does one-title lookups),
+  // so this bootstraps from TMDB's own top-rated ranking (with a vote-count floor to
+  // filter out tiny-sample outliers), then cross-checks each one's real IMDb score
+  // via OMDb and keeps only the ones that clear 7.0.
+  const params = new URLSearchParams({
+    api_key: TMDB_API_KEY,
+    sort_by: 'vote_average.desc',
+    'vote_count.gte': '1000',
+    page: String(page)
+  });
+  const tmdbRes = await fetch(`https://api.themoviedb.org/3/discover/movie?${params}`);
+  if (!tmdbRes.ok) {
+    return res.json({ results: [], reason: `TMDB request failed (${tmdbRes.status})` });
+  }
+  const data = await tmdbRes.json();
+  const candidates = data.results || [];
+
+  const enriched = await Promise.all(candidates.map(async (m) => {
+    const t = await getTmdbDetails(m.id).catch(() => null);
+    if (!t) return null;
+    const imdb = await lookupOmdbRating(t.title, t.year).catch(() => ({ rating: null }));
+    if (!imdb.rating || parseFloat(imdb.rating) < 7.0) return null;
+    return {
+      id: t.id,
+      title: t.title,
+      year: t.year,
+      country: t.country,
+      director: t.director,
+      cast: t.cast,
+      posterUrl: t.posterThumbUrl,
+      imdbRating: imdb.rating
+    };
+  }));
+
+  const results = enriched.filter(Boolean).sort((a, b) => parseFloat(b.imdbRating) - parseFloat(a.imdbRating));
+  const result = { results, page, totalPages: data.total_pages || 1 };
+  cache.set(cacheKey, result);
+  res.json(result);
+});
+
 app.get('/api/search-movies', async (req, res) => {
   const { q, lang } = req.query;
   if (!q || q.length < 2) {
