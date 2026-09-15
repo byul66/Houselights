@@ -72,20 +72,41 @@ app.get('/api/movie-data', async (req, res) => {
   res.json(result);
 });
 
-// Poster-only lookup for row thumbnails — avoids burning OMDb's daily quota
-// on rows where only the poster is displayed (rating is only needed on the movie page).
+// Lightweight row-details lookup (poster + director + cast) for list rows across the
+// site — skips OMDb entirely (rating is only needed on the movie page itself) so this
+// stays cheap even across hundreds of rows.
 app.get('/api/poster', async (req, res) => {
   const { title, year } = req.query;
   if (!title) {
     return res.status(400).json({ error: 'title query param is required' });
   }
-  const cacheKey = `poster:${title}::${year || ''}`;
+  const cacheKey = `row-details:${title}::${year || ''}`;
   if (cache.has(cacheKey)) {
     return res.json(cache.get(cacheKey));
   }
-  const poster = await lookupTmdbPoster(title, year).catch((err) => ({ url: null, reason: err.message }));
-  cache.set(cacheKey, poster);
-  res.json(poster);
+  if (!TMDB_API_KEY) {
+    const result = { url: null, director: null, cast: [], reason: 'TMDB_API_KEY not configured' };
+    cache.set(cacheKey, result);
+    return res.json(result);
+  }
+
+  const params = new URLSearchParams({ api_key: TMDB_API_KEY, query: title });
+  if (year) params.set('year', year);
+  const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?${params}`).catch(() => null);
+  const searchData = searchRes && searchRes.ok ? await searchRes.json() : null;
+  const match = searchData && searchData.results && searchData.results[0];
+  if (!match) {
+    const result = { url: null, director: null, cast: [], reason: `No TMDB match found for "${title}"` };
+    cache.set(cacheKey, result);
+    return res.json(result);
+  }
+
+  const t = await getTmdbDetails(match.id).catch(() => null);
+  const result = t
+    ? { url: t.posterThumbUrl, director: t.director, cast: t.cast, country: t.country }
+    : { url: null, director: null, cast: [], reason: 'TMDB detail request failed' };
+  cache.set(cacheKey, result);
+  res.json(result);
 });
 
 // Fallback when TMDB doesn't return production_countries for a title.

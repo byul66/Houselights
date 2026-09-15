@@ -352,11 +352,19 @@
     rows.forEach(function(rowEl, i){
       var item = items[i];
       var posterEl = rowEl.querySelector('.row-poster');
+      var infoEl = rowEl.querySelector('.info');
       if (!item || !posterEl) return;
       var yearParam = /^\d{4}$/.test(String(item.y)) ? item.y : '';
       fetch('/api/poster?title=' + encodeURIComponent(item.t) + (yearParam ? '&year='+yearParam : ''))
         .then(function(r){ return r.json(); })
-        .then(function(data){ if (data.url) posterEl.style.backgroundImage = 'url(' + data.url + ')'; })
+        .then(function(data){
+          if (data.url) posterEl.style.backgroundImage = 'url(' + data.url + ')';
+          var crew = [
+            data.director ? ('Dir. ' + data.director) : null,
+            data.cast && data.cast.length ? data.cast.join(', ') : null
+          ].filter(Boolean).join(' · ');
+          if (crew && infoEl) infoEl.insertAdjacentHTML('beforeend', '<div class="y">'+crew+'</div>');
+        })
         .catch(function(){});
     });
   }
