@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Houselights</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c0c0e; --surface: #17171a; --surface-2: #1e1e22; --border: #2a2a2f;
+    --teal: #2dd4bf; --teal-dim: #1f7d70; --gold: #f0c25e;
+    --text: #f2f2f0; --text-muted: #8b8b90;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Sora', sans-serif; line-height: 1.5; position: relative;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 0 48px; position: relative; z-index: 2; }
+
+  header { border-bottom: 1px solid var(--border); padding: 20px 0; position: relative; z-index: 2; }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+  .name { font-weight: 700; font-size: 20px; letter-spacing: -0.3px; cursor: pointer; }
+  .name .lights { color: var(--gold); }
+  .search-wrap { position: relative; width: 280px; }
+  .search { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 9px 14px; color: var(--text); font-size: 14px; width: 100%; font-family: inherit; }
+  .search::placeholder { color: var(--text-muted); }
+  .dropdown {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 6px; overflow-y: auto; max-height: 420px; display: none; z-index: 10;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+  }
+  .dropdown.show { display: block; }
+  .dropdown .item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border); }
+  .dropdown .item:last-child { border-bottom: none; }
+  .dropdown .item:hover { background: var(--surface); }
+  .dropdown .item:hover .item-title { color: var(--teal); }
+  .dropdown .item-poster { width: 32px; height: 48px; border-radius: 3px; flex-shrink: 0; background: var(--surface); background-size: cover; background-position: center; border: 1px solid rgba(255,255,255,0.08); }
+  .dropdown .item-info { min-width: 0; flex: 1; }
+  .dropdown .item-title { font-size: 13px; font-weight: 600; }
+  .dropdown .item-year { font-weight: 400; color: var(--text-muted); }
+  .dropdown .item-meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+  .dropdown .item-cast { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  main { padding: 80px 0 80px; }
+  .view { display: none; animation: fade 0.4s ease; }
+  .view.show { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
+
+  .crumbs { font-size: 13px; color: var(--text-muted); margin: 12px 0 24px; }
+  .crumbs a { color: var(--text-muted); text-decoration: none; cursor: pointer; }
+  .crumbs a:hover { color: var(--teal); }
+  .crumbs .current { color: var(--text); }
+
+  h2.section-title { font-size: 15px; font-weight: 600; margin: 0 0 18px; }
+  section { margin-bottom: 60px; }
+  .section-note { font-size: 12px; color: var(--text-muted); margin: -8px 0 18px; }
+
+  .film-list { display: flex; flex-direction: column; }
+  .film-row { display: flex; align-items: center; gap: 18px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .film-row.clickable { cursor: pointer; }
+  .film-row.clickable:hover .t { color: var(--teal); }
+  .rank { width: 20px; font-size: 13px; color: var(--text-muted); flex-shrink: 0; text-align: right; }
+  .row-poster { width: 40px; height: 60px; border-radius: 3px; flex-shrink: 0; background: var(--surface-2); background-size: cover; background-position: center; border: 1px solid rgba(255,255,255,0.08); }
+  .film-row .info { flex: 1; min-width: 0; }
+  .film-row .t { font-weight: 600; font-size: 14px; }
+  .film-row .y { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .film-row .right { text-align: right; flex-shrink: 0; }
+  .film-row .right .n { font-weight: 700; font-size: 14px; color: var(--teal); }
+  .film-row .right .note { font-size: 11px; color: var(--text-muted); margin-top: 2px; max-width: 220px; }
+  .gap-note { padding: 16px 0; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+  .view-more { padding: 14px 0; font-size: 13px; color: var(--teal); cursor: pointer; text-align: center; border-bottom: 1px solid var(--border); }
+  .view-more:hover { color: var(--text); }
+
+  .country-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 8px 16px; font-size: 13px; }
+  .chip.clickable { cursor: pointer; transition: border-color 0.15s ease; }
+  .chip.clickable:hover { border-color: var(--teal-dim); }
+  .chip.disabled { color: var(--text-muted); opacity: 0.5; }
+  .more { font-size: 12px; color: var(--text-muted); margin-top: 14px; }
+
+  .country-context { font-size: 13px; color: var(--text-muted); margin: -10px 0 26px; }
+
+  .tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--border); margin-bottom: 4px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { background: none; border: none; color: var(--text-muted); font-family: inherit; font-size: 13px; padding: 10px 0; cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.15s ease; white-space: nowrap; flex-shrink: 0; }
+  .tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+  .list-panel { display: none; }
+  .list-panel.show { display: block; }
+
+  .hero { display: grid; grid-template-columns: 210px 1fr; gap: 34px; align-items: start; }
+  .poster { aspect-ratio: 2/3; border-radius: 5px; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 18px 40px rgba(0,0,0,0.5); }
+  .poster::after { content: ""; position: absolute; inset: 0; background: linear-gradient(165deg, rgba(255,255,255,0.12), transparent 55%); }
+  .poster .init { position: absolute; bottom: 14px; left: 14px; font-size: 13px; color: rgba(255,255,255,0.55); letter-spacing: 0.5px; }
+  .meta-line { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; }
+  .title { font-size: 27px; font-weight: 700; line-height: 1.2; margin: 0 0 14px; max-width: 460px; }
+  .score { display: inline-flex; align-items: baseline; gap: 6px; font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+  .score b { font-size: 18px; color: var(--teal); font-weight: 700; }
+  .score .score-note { font-size: 11px; color: var(--text-muted); margin-left: 4px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+  .badge { font-size: 12px; border: 1px solid var(--teal-dim); color: var(--teal); padding: 5px 10px; border-radius: 4px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 12px; max-width: 480px; margin-bottom: 26px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; }
+  .stat .label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+  .stat .value { font-size: 18px; font-weight: 700; }
+  .stat .sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  .recog-box { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px 18px; max-width: 480px; }
+  .recog-box h3 { font-size: 13px; margin: 0 0 12px; color: var(--text-muted); font-weight: 600; }
+  .recog-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; font-size: 13px; padding: 6px 0; }
+  .recog-row .k { color: var(--text-muted); flex-shrink: 0; }
+  .recog-row > span:last-child { text-align: right; }
+
+  .poster-note { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="name" onclick="showView('home')">House<span class="lights">lights</span></div>
+    <div class="search-wrap">
+      <input class="search" id="searchInput" placeholder="Search a film" oninput="onSearch(this.value)" onfocus="onSearch(this.value)">
+      <div class="dropdown" id="dropdown"></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- HOME -->
+  <div class="view show" id="view-home">
+    <section>
+      <div class="tabs" data-scope="global">
+        <button class="tab active" data-group="thisweek" onclick="switchTab('global','thisweek',this)">This week's box office</button>
+        <button class="tab" data-group="box" onclick="switchTab('global','box',this)">All time box office</button>
+        <button class="tab" data-group="imdb" onclick="switchTab('global','imdb',this)">Highest IMDb scores</button>
+        <button class="tab" data-group="picture" onclick="switchTab('global','picture',this)">Best Picture</button>
+        <button class="tab" data-group="palme" onclick="switchTab('global','palme',this)">Palme d'Or, Cannes</button>
+        <button class="tab" data-group="lion" onclick="switchTab('global','lion',this)">Golden Lion, Venice</button>
+        <button class="tab" data-group="bear" onclick="switchTab('global','bear',this)">Golden Bear, Berlin</button>
+      </div>
+      <div class="list-panel show" data-scope="global" data-group="thisweek" id="panel-global-thisweek"></div>
+      <div class="list-panel" data-scope="global" data-group="box" id="panel-global-box"></div>
+      <div class="list-panel" data-scope="global" data-group="imdb" id="panel-global-imdb"></div>
+      <div class="list-panel" data-scope="global" data-group="picture" id="panel-global-picture"></div>
+      <div class="list-panel" data-scope="global" data-group="palme" id="panel-global-palme"></div>
+      <div class="list-panel" data-scope="global" data-group="lion" id="panel-global-lion"></div>
+      <div class="list-panel" data-scope="global" data-group="bear" id="panel-global-bear"></div>
+    </section>
+
+    <section>
+      <h2 class="section-title">Browse by country</h2>
+      <div class="country-grid">
+        <div class="chip clickable" onclick="showView('country','thailand')">Thailand</div>
+        <div class="chip clickable" onclick="showView('country','united-states')">United States</div>
+        <div class="chip clickable" onclick="showView('country','south-korea')">South Korea</div>
+        <div class="chip clickable" onclick="showView('country','japan')">Japan</div>
+        <div class="chip clickable" onclick="showView('country','united-kingdom')">United Kingdom</div>
+        <div class="chip clickable" onclick="showView('country','france')">France</div>
+        <div class="chip clickable" onclick="showView('country','germany')">Germany</div>
+        <div class="chip clickable" onclick="showView('country','italy')">Italy</div>
+        <div class="chip clickable" onclick="showView('country','spain')">Spain</div>
+        <div class="chip clickable" onclick="showView('country','iran')">Iran</div>
+        <div class="chip clickable" onclick="showView('country','sweden')">Sweden</div>
+        <div class="chip clickable" onclick="showView('country','denmark')">Denmark</div>
+        <div class="chip clickable" onclick="showView('country','norway')">Norway</div>
+        <div class="chip clickable" onclick="showView('country','finland')">Finland</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- COUNTRY (template, filled by renderCountry) -->
+  <div class="view" id="view-country">
+    <div class="crumbs" id="countryCrumbs"></div>
+    <h2 class="section-title" style="font-size:22px;" id="countryName"></h2>
+    <div class="country-context" id="countryContext"></div>
+    <div class="tabs" data-scope="country">
+      <button class="tab active" data-group="box" onclick="switchTab('country','box',this)">Box office leaders</button>
+      <button class="tab" data-group="recognized" onclick="switchTab('country','recognized',this)">Internationally recognized</button>
+    </div>
+    <div class="list-panel show" data-scope="country" data-group="box" id="panel-country-box"></div>
+    <div class="list-panel" data-scope="country" data-group="recognized" id="panel-country-recognized"></div>
+  </div>
+
+  <!-- MOVIE (template, filled by renderMovie) -->
+  <div class="view" id="view-movie">
+    <div class="crumbs" id="movieCrumbs"></div>
+    <div class="hero">
+      <div>
+        <div class="poster" id="moviePoster"><div class="init" id="posterInit"></div></div>
+        <div class="poster-note" id="posterNote"></div>
+      </div>
+      <div>
+        <div class="meta-line" id="movieMeta"></div>
+        <h1 class="title" id="movieTitle"></h1>
+        <div class="score"><b id="scoreValue">&mdash;</b> IMDb<span class="score-note" id="scoreNote"></span></div>
+        <div class="badges" id="movieBadges"></div>
+        <div class="stats" id="movieStats"></div>
+        <div class="recog-box">
+          <h3>Awards recognition</h3>
+          <div id="movieAwards"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  function showView(name, slug) {
+    document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('show'); });
+    document.getElementById('view-'+name).classList.add('show');
+    document.getElementById('dropdown').classList.remove('show');
+    window.scrollTo(0,0);
+    if (name === 'country') renderCountry(slug);
+    if (name === 'movie') renderMovie(slug);
+  }
+  function switchTab(scope, group, el) {
+    document.querySelectorAll('.tabs[data-scope="'+scope+'"] .tab').forEach(function(b){ b.classList.toggle('active', b===el); });
+    document.querySelectorAll('.list-panel[data-scope="'+scope+'"]').forEach(function(p){ p.classList.toggle('show', p.getAttribute('data-group')===group); });
+  }
+
+  function movieLink(item, kind) {
+    if (item.link) return item.link;
+    var yearParam = /^\d{4}$/.test(String(item.y)) ? item.y : '';
+    var link = 'title:' + encodeURIComponent(item.t) + '|' + yearParam;
+    if (kind === 'recognized' && item.v) {
+      var recognition = item.v + (item.note ? ' — ' + item.note : '');
+      link += '|' + encodeURIComponent(recognition);
+    }
+    return link;
+  }
+  function rowHTML(item, i, kind) {
+    var rank = item.rank ? '<div class="rank">'+item.rank+'</div>' : '';
+    var link = movieLink(item, kind);
+    return '<div class="film-row clickable" onclick="showView(\'movie\',\''+link+'\')">'+rank+
+      '<div class="row-poster"></div>'+
+      '<div class="info"><div class="t">'+item.t+'</div><div class="y">'+item.y+(item.c?' &middot; '+item.c:'')+'</div></div>'+
+      '<div class="right"><span class="n">'+item.v+'</span>'+(item.note?'<div class="note">'+item.note+'</div>':'')+'</div></div>';
+  }
+  function renderList(id, items, gapNote, limit, kind) {
+    limit = limit || 15;
+    var visible = items.slice(0, limit);
+    var rest = items.slice(limit);
+    var rowHTMLKind = function(item, i){ return rowHTML(item, i, kind); };
+    var html = visible.map(rowHTMLKind).join('');
+    if (rest.length) {
+      html += '<div class="hidden-rows" style="display:none">' + rest.map(rowHTMLKind).join('') + '</div>';
+      html += '<div class="view-more" onclick="expandList(this)">View '+rest.length+' more</div>';
+    }
+    if (gapNote) html += '<div class="gap-note">'+gapNote+'</div>';
+    document.getElementById(id).innerHTML = html;
+    enrichRowPosters(id, visible.concat(rest));
+  }
+  function enrichRowPosters(id, items) {
+    var rows = document.querySelectorAll('#'+id+' .film-row');
+    rows.forEach(function(rowEl, i){
+      var item = items[i];
+      var posterEl = rowEl.querySelector('.row-poster');
+      if (!item || !posterEl) return;
+      var yearParam = /^\d{4}$/.test(String(item.y)) ? item.y : '';
+      fetch('/api/poster?title=' + encodeURIComponent(item.t) + (yearParam ? '&year='+yearParam : ''))
+        .then(function(r){ return r.json(); })
+        .then(function(data){ if (data.url) posterEl.style.backgroundImage = 'url(' + data.url + ')'; })
+        .catch(function(){});
+    });
+  }
+  function expandList(el) {
+    el.previousElementSibling.style.display = 'block';
+    el.style.display = 'none';
+  }
+
+  function movieInitials(title) {
+    return title.split(' ').filter(function(w){return w.length>2;}).slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();
+  }
+
+  function renderCountry(slug) {
+    var c = countries[slug];
+    document.getElementById('countryCrumbs').innerHTML =
+      '<a onclick="showView(\'home\')">Houselights</a> / <span class="current">'+c.name+'</span>';
+    document.getElementById('countryName').textContent = c.name;
+    document.getElementById('countryContext').textContent = c.context;
+    renderList('panel-country-box', c.box, c.boxGapNote, 20, 'box');
+    renderList('panel-country-recognized', c.recognized, c.recognizedGapNote, 20, 'recognized');
+    document.querySelectorAll('.tabs[data-scope="country"] .tab').forEach(function(t,i){ t.classList.toggle('active', i===0); });
+    document.querySelectorAll('.list-panel[data-scope="country"]').forEach(function(p){ p.classList.toggle('show', p.getAttribute('data-group')==='box'); });
+  }
+
+  function renderMovie(slug) {
+    if (movies[slug]) { renderCuratedMovie(movies[slug]); return; }
+    if (!slug) return;
+    if (slug.indexOf('tmdb:') === 0) { renderGenericMovie({ id: slug.slice(5) }); return; }
+    if (slug.indexOf('title:') === 0) {
+      var parts = slug.slice(6).split('|');
+      renderGenericMovie({
+        title: decodeURIComponent(parts[0] || ''),
+        year: parts[1] || '',
+        knownRecognition: parts[2] ? decodeURIComponent(parts[2]) : null
+      });
+    }
+  }
+
+  function renderCuratedMovie(m) {
+    document.getElementById('movieCrumbs').innerHTML =
+      '<a onclick="showView(\'home\')">Houselights</a> / ' +
+      '<a onclick="showView(\'country\',\''+m.countrySlug+'\')">'+m.country+'</a> / ' +
+      '<span class="current">'+m.title+'</span>';
+    document.getElementById('movieMeta').textContent = m.country + ' · ' + m.year + ' · ' + m.genre;
+    document.getElementById('movieTitle').textContent = m.title;
+    document.getElementById('moviePoster').removeAttribute('style');
+    document.getElementById('moviePoster').innerHTML = '<div class="init" id="posterInit">'+movieInitials(m.title)+'</div>';
+    document.getElementById('posterNote').style.display = '';
+    document.getElementById('posterNote').textContent = 'Poster art placeholder — real art needs a licensed source (e.g. TMDB API)';
+    document.getElementById('scoreValue').textContent = '—';
+    document.getElementById('scoreNote').textContent = '';
+    document.getElementById('movieBadges').innerHTML = m.badges.map(function(b){ return '<span class="badge">'+b+'</span>'; }).join('');
+    document.getElementById('movieStats').innerHTML = m.stats.map(function(s){
+      return '<div class="stat"><div class="label">'+s.label+'</div><div class="value">'+s.value+'</div>'+(s.sub?'<div class="sub">'+s.sub+'</div>':'')+'</div>';
+    }).join('');
+    document.getElementById('movieAwards').innerHTML = m.awards.map(function(a){
+      return '<div class="recog-row"><span class="k">'+a.k+'</span><span>'+a.v+'</span></div>';
+    }).join('');
+    enrichMoviePage(m);
+  }
+
+  function enrichMoviePage(movie) {
+    var posterEl = document.getElementById('moviePoster');
+    var noteEl = document.getElementById('posterNote');
+    var scoreEl = document.getElementById('scoreValue');
+    var scoreNoteEl = document.getElementById('scoreNote');
+
+    fetch('/api/movie-data?title=' + encodeURIComponent(movie.title) + '&year=' + movie.year)
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if (data.poster && data.poster.url) {
+          posterEl.innerHTML = '';
+          posterEl.style.backgroundImage = 'url(' + data.poster.url + ')';
+          posterEl.style.backgroundSize = 'cover';
+          posterEl.style.backgroundPosition = 'center';
+          noteEl.style.display = 'none';
+        } else if (data.poster) {
+          noteEl.style.display = '';
+          noteEl.textContent = 'Poster art placeholder — ' + data.poster.reason;
+        }
+
+        if (data.imdb && data.imdb.rating) {
+          scoreEl.textContent = data.imdb.rating;
+          scoreNoteEl.textContent = 'live from OMDb';
+        } else if (data.imdb) {
+          scoreNoteEl.textContent = data.imdb.reason;
+        }
+      })
+      .catch(function(err){
+        console.warn('movie-data fetch failed', err);
+        scoreNoteEl.textContent = 'could not reach Houselights server';
+      });
+  }
+
+  function fmtMoney(n) {
+    if (n >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
+    return '$' + (n / 1e6).toFixed(1) + 'M';
+  }
+
+  function countrySlugByName(name) {
+    for (var slug in countries) {
+      if (countries[slug].name === name) return slug;
+    }
+    return null;
+  }
+
+  function renderGenericMovie(query) {
+    var displayTitle = query.title || null;
+    document.getElementById('movieCrumbs').innerHTML = '<a onclick="showView(\'home\')">Houselights</a> / <span class="current">Loading…</span>';
+    document.getElementById('movieMeta').textContent = '';
+    document.getElementById('movieTitle').textContent = displayTitle || 'Loading…';
+    document.getElementById('moviePoster').removeAttribute('style');
+    document.getElementById('moviePoster').innerHTML = '';
+    document.getElementById('posterNote').style.display = 'none';
+    document.getElementById('scoreValue').textContent = '—';
+    document.getElementById('scoreNote').textContent = '';
+    document.getElementById('movieBadges').innerHTML = '';
+    document.getElementById('movieStats').innerHTML = '';
+    document.getElementById('movieAwards').innerHTML = '';
+
+    var url = query.id
+      ? '/api/movie-details?id=' + encodeURIComponent(query.id)
+      : '/api/movie-details?title=' + encodeURIComponent(query.title) + (query.year ? '&year=' + encodeURIComponent(query.year) : '');
+
+    fetch(url)
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        var t = data.tmdb;
+        if (!t) {
+          document.getElementById('movieTitle').textContent = displayTitle || 'Could not load this film';
+          document.getElementById('movieMeta').textContent = data.reason || '';
+          return;
+        }
+        var heading = displayTitle || t.title;
+        var country = t.country || 'Unknown';
+        var countrySlug = countrySlugByName(country);
+        document.getElementById('movieCrumbs').innerHTML =
+          '<a onclick="showView(\'home\')">Houselights</a> / ' +
+          (countrySlug ? '<a onclick="showView(\'country\',\''+countrySlug+'\')">'+country+'</a> / ' : country + ' / ') +
+          '<span class="current">'+heading+'</span>';
+        document.getElementById('movieMeta').textContent = country + ' · ' + (t.year || '—') + ' · ' + (t.genres.length ? t.genres.join(', ') : 'genre not available via TMDB');
+        document.getElementById('movieTitle').textContent = heading;
+        document.getElementById('movieBadges').innerHTML =
+          (t.director ? '<span class="badge">Dir. '+t.director+'</span>' : '') +
+          (t.cast.length ? '<span class="badge">'+t.cast.join(', ')+'</span>' : '');
+
+        var posterEl = document.getElementById('moviePoster');
+        var noteEl = document.getElementById('posterNote');
+        if (t.posterUrl) {
+          posterEl.style.backgroundImage = 'url(' + t.posterUrl + ')';
+          posterEl.style.backgroundSize = 'cover';
+          posterEl.style.backgroundPosition = 'center';
+        } else {
+          posterEl.innerHTML = '<div class="init">'+movieInitials(t.title)+'</div>';
+          noteEl.style.display = '';
+          noteEl.textContent = 'No poster available from TMDB for this title';
+        }
+
+        if (data.imdb && data.imdb.rating) {
+          document.getElementById('scoreValue').textContent = data.imdb.rating;
+          document.getElementById('scoreNote').textContent = 'live from OMDb';
+        } else if (data.imdb) {
+          document.getElementById('scoreNote').textContent = data.imdb.reason;
+        }
+
+        var hasFinancials = t.budget > 0 && t.revenue > 0;
+        var stats = [
+          { label: "Domestic box office (" + country + ")", value: "Not available", sub: "not reported per-country by TMDB or OMDb" },
+          { label: "Worldwide box office", value: t.revenue ? fmtMoney(t.revenue) : "Not available via TMDB" },
+          { label: "Budget", value: t.budget ? fmtMoney(t.budget) : "Not available via TMDB" },
+          { label: "Revenue to budget", value: hasFinancials ? (t.revenue / t.budget).toFixed(1) + '×' : "Not available", sub: hasFinancials ? "gross revenue, not profit" : null }
+        ];
+        document.getElementById('movieStats').innerHTML = stats.map(function(s){
+          return '<div class="stat"><div class="label">'+s.label+'</div><div class="value">'+s.value+'</div>'+(s.sub?'<div class="sub">'+s.sub+'</div>':'')+'</div>';
+        }).join('');
+
+        document.getElementById('movieAwards').innerHTML = query.knownRecognition
+          ? '<div class="recog-row"><span class="k">Recognition</span><span>'+query.knownRecognition+'</span></div>'
+          : '<div class="recog-row"><span class="k">Recognition</span><span>Not independently researched for this title yet — shown once verified, not filled with placeholders.</span></div>';
+      })
+      .catch(function(){
+        document.getElementById('movieTitle').textContent = 'Could not load this film';
+      });
+  }
+
+  var data = {
+    globalBox: [
+      {t:"Avatar", y:2009, c:"United States", v:"$2.92B"},
+      {t:"Avengers: Endgame", y:2019, c:"United States", v:"$2.80B"},
+      {t:"Avatar: The Way of Water", y:2022, c:"United States", v:"$2.32B"},
+      {t:"Titanic", y:1997, c:"United States", v:"$2.26B"},
+      {t:"Star Wars: The Force Awakens", y:2015, c:"United States", v:"$2.07B"},
+      {t:"Avengers: Infinity War", y:2018, c:"United States", v:"$2.05B"},
+      {t:"Spider-Man: No Way Home", y:2021, c:"United States", v:"$1.92B"},
+      {t:"The Odyssey", y:2026, c:"United States", v:"$1.69B"},
+      {t:"Inside Out 2", y:2024, c:"United States", v:"$1.70B"},
+      {t:"Jurassic World", y:2015, c:"United States", v:"$1.67B"},
+      {t:"The Lion King", y:2019, c:"United States", v:"$1.66B"},
+      {t:"The Avengers", y:2012, c:"United States", v:"$1.52B"},
+      {t:"Furious 7", y:2015, c:"United States", v:"$1.52B"},
+      {t:"Top Gun: Maverick", y:2022, c:"United States", v:"$1.50B"},
+      {t:"Frozen II", y:2019, c:"United States", v:"$1.45B"},
+      {t:"Barbie", y:2023, c:"United States", v:"$1.45B"},
+      {t:"Avengers: Age of Ultron", y:2015, c:"United States", v:"$1.40B"},
+      {t:"The Super Mario Bros. Movie", y:2023, c:"United States", v:"$1.36B"},
+      {t:"Black Panther", y:2018, c:"United States", v:"$1.35B"},
+      {t:"Harry Potter and the Deathly Hallows Part 2", y:2011, c:"United States", v:"$1.34B"}
+    ],
+    globalImdb: [
+      {t:"The Shawshank Redemption", y:1994, v:"9.3"},
+      {t:"The Godfather", y:1972, v:"9.2"},
+      {t:"The Dark Knight", y:2008, v:"9.0"},
+      {t:"The Godfather Part II", y:1974, v:"9.0"},
+      {t:"12 Angry Men", y:1957, v:"9.0"},
+      {t:"Schindler's List", y:1993, v:"9.0"},
+      {t:"The Lord of the Rings: The Return of the King", y:2003, v:"9.0"},
+      {t:"Pulp Fiction", y:1994, v:"8.9"},
+      {t:"The Lord of the Rings: The Fellowship of the Ring", y:2001, v:"8.9"},
+      {t:"The Good, the Bad and the Ugly", y:1966, v:"8.8"},
+      {t:"Forrest Gump", y:1994, v:"8.8"},
+      {t:"The Lord of the Rings: The Two Towers", y:2002, v:"8.8"},
+      {t:"Fight Club", y:1999, v:"8.8"},
+      {t:"Inception", y:2010, v:"8.8"},
+      {t:"Star Wars: Episode V - The Empire Strikes Back", y:1980, v:"8.7"},
+      {t:"The Matrix", y:1999, v:"8.7"},
+      {t:"Goodfellas", y:1990, v:"8.7"},
+      {t:"One Flew Over the Cuckoo's Nest", y:1975, v:"8.7"},
+      {t:"Se7en", y:1995, v:"8.6"},
+      {t:"It's a Wonderful Life", y:1946, v:"8.6"}
+    ],
+    globalPicture: [
+      {t:"Anora", y:2025, v:""},{t:"Oppenheimer", y:2024, v:""},{t:"Everything Everywhere All at Once", y:2023, v:""},
+      {t:"CODA", y:2022, v:""},{t:"Nomadland", y:2021, v:""},{t:"Parasite", y:2020, v:"", c:"South Korea"},
+      {t:"Green Book", y:2019, v:""},{t:"The Shape of Water", y:2018, v:""},{t:"Moonlight", y:2017, v:""},
+      {t:"Spotlight", y:2016, v:""},{t:"Birdman", y:2015, v:""},{t:"12 Years a Slave", y:2014, v:""},
+      {t:"Argo", y:2013, v:""},{t:"The Artist", y:2012, v:""},{t:"The King's Speech", y:2011, v:""},
+      {t:"The Hurt Locker", y:2010, v:""},{t:"Slumdog Millionaire", y:2009, v:""},{t:"No Country for Old Men", y:2008, v:""},
+      {t:"The Departed", y:2007, v:""},{t:"Crash", y:2006, v:""}
+    ],
+    globalPalme: [
+      {t:"It Was Just an Accident", y:2025, c:"Iran", v:""},{t:"Anora", y:2024, v:""},{t:"Anatomy of a Fall", y:2023, v:""},
+      {t:"Triangle of Sadness", y:2022, v:""},{t:"Titane", y:2021, v:""},{t:"No award — festival cancelled", y:2020, v:""},
+      {t:"Parasite", y:2019, c:"South Korea", v:""},{t:"Shoplifters", y:2018, v:""},{t:"The Square", y:2017, v:""},
+      {t:"I, Daniel Blake", y:2016, v:""},{t:"Dheepan", y:2015, v:""},{t:"Winter Sleep", y:2014, v:""},
+      {t:"Blue Is the Warmest Colour", y:2013, v:""},{t:"Amour", y:2012, v:""},{t:"The Tree of Life", y:2011, v:""},
+      {t:"Uncle Boonmee Who Can Recall His Past Lives", y:2010, c:"Thailand", v:""},{t:"The White Ribbon", y:2009, v:""},
+      {t:"The Class", y:2008, v:""},{t:"4 Months, 3 Weeks and 2 Days", y:2007, v:""},{t:"The Wind That Shakes the Barley", y:2006, v:""}
+    ],
+    globalThisWeek: [
+      {t:"Spider-Man: Brand New Day", y:"day 38", v:"$18.0M", note:"weekend gross"},
+      {t:"The Odyssey", y:"day 52", v:"$13.0M", note:"weekend gross"},
+      {t:"Coyote vs. Acme", y:"day 10", v:"$11.3M", note:"weekend gross"},
+      {t:"By Any Means", y:"new release", v:"$7.4M", note:"weekend gross"},
+      {t:"Insidious: Out of the Further", y:"day 17", v:"$6.5M", note:"weekend gross"},
+      {t:"Cars", y:"re-release", v:"$6.1M", note:"weekend gross"},
+      {t:"PAW Patrol: The Dino Movie", y:"day 24", v:"$3.3M", note:"weekend gross"},
+      {t:"The End of Oak Street", y:"day 24", v:"$2.9M", note:"weekend gross"}
+    ],
+    globalLion: [
+      {t:"Father Mother Sister Brother", y:2025, v:""},
+      {t:"Poor Things", y:2023, v:""},
+      {t:"All the Beauty and the Bloodshed", y:2022, v:""},
+      {t:"Happening", y:2021, v:""},
+      {t:"Nomadland", y:2020, v:""},
+      {t:"Joker", y:2019, v:""},
+      {t:"Roma", y:2018, v:""},
+      {t:"The Wrestler", y:2008, v:""},
+      {t:"Lust, Caution", y:2007, v:""},
+      {t:"Still Life", y:2006, c:"China", v:""}
+    ],
+    globalBear: [
+      {t:"Alcarràs", y:2022, v:""},
+      {t:"Bad Luck Banging or Loony Porn", y:2021, v:""},
+      {t:"There Is No Evil", y:2020, c:"Iran", v:""},
+      {t:"On Body and Soul", y:2017, v:""},
+      {t:"Fire at Sea", y:2016, v:""},
+      {t:"Taxi", y:2015, c:"Iran", v:""},
+      {t:"Black Coal, Thin Ice", y:2014, v:""},
+      {t:"Child's Pose", y:2013, v:""},
+      {t:"Caesar Must Die", y:2012, v:""},
+      {t:"A Separation", y:2011, c:"Iran", v:""},
+      {t:"Honey", y:2010, v:""},
+      {t:"The Milk of Sorrow", y:2009, v:""},
+      {t:"Tropa de Elite", y:2008, v:""},
+      {t:"Tuya's Marriage", y:2007, c:"China", v:""},
+      {t:"Grbavica", y:2006, v:""}
+    ]
+  };
+
+  var countries = {
+    thailand: {
+      name: "Thailand",
+      context: "24 official Oscar submissions since 1984",
+      boxGapNote: "Ranks 24–50 aren't independently verified yet — shown once sourced, not filled with placeholders.",
+      box: [
+        {t:"How to make millions before grandma dies", y:2024, v:"฿172.7M", link:"how-to-make-millions-before-grandma-dies"},
+        {t:"Tom-Yum-Goong", y:2005, v:"฿183.4M"},
+        {t:"Love Destiny: The Movie", y:2022, v:"฿167.7M"},
+        {t:"Joking Jazz 4G", y:2016, v:"฿166.5M"},
+        {t:"Nakee 2", y:2018, v:"฿161.2M"},
+        {t:"Bang Rajan", y:2000, v:"฿151.0M"},
+        {t:"ATM: Er Rak Error", y:2012, v:"฿150.1M"},
+        {t:"Nang Nak", y:1999, v:"฿149.6M"},
+        {t:"Brother of the Year", y:2018, v:"฿146.5M"},
+        {t:"Bangkok Traffic (Love) Story", y:2009, v:"฿145.8M"},
+        {t:"The Holy Man", y:2005, v:"฿141.9M"},
+        {t:"Tootsies & The Fake", y:2019, v:"฿140.0M"},
+        {t:"Death Whisperer 3", y:2025, v:"฿137.9M"},
+        {t:"My Girl", y:2003, v:"฿137.3M"},
+        {t:"Friend Zone", y:2019, v:"฿134.2M"},
+        {t:"The Legend of King Naresuan 4", y:2011, v:"฿131.6M"},
+        {t:"4 Kings II", y:2023, v:"฿95.2M"},
+        {t:"Noodle Boxer", y:2006, v:"฿94.2M"},
+        {t:"Khan Kluay", y:2006, v:"฿93.6M"},
+        {t:"The Undertaker 2", y:2026, v:"฿93.4M"},
+        {t:"Nong Teng", y:2006, v:"฿90.1M"},
+        {t:"Bangkok Haunted", y:2001, v:"฿90.0M"},
+        {t:"Saranair: The Movie", y:2009, v:"฿88.1M"}
+      ],
+      recognizedGapNote: "9 real, verified entries so far, expanded from the original 7 — still short of 20. Reaching 20 needs deeper research into smaller festivals (Locarno, Rotterdam, Busan), not padding with unverified titles.",
+      recognized: [
+        {t:"How to make millions before grandma dies", y:2024, v:"Oscar shortlist", note:"First-ever Thai shortlist placement", link:"how-to-make-millions-before-grandma-dies"},
+        {t:"One for the Road", y:2021, v:"Sundance Jury Award", note:"Special Jury Award for Creative Vision"},
+        {t:"Memoria", y:2021, v:"Cannes Jury Prize"},
+        {t:"Cemetery of Splendour", y:2015, v:"Cannes Un Certain Regard"},
+        {t:"Uncle Boonmee Who Can Recall His Past Lives", y:2010, v:"Cannes Palme d'Or"},
+        {t:"Syndromes and a Century", y:2006, v:"Venice competition", note:"First Thai film in Venice competition"},
+        {t:"Tropical Malady", y:2004, v:"Cannes Jury Prize"},
+        {t:"Blissfully Yours", y:2002, v:"Cannes Un Certain Regard Prize"},
+        {t:"Tears of the Black Tiger", y:2001, v:"Cannes selection", note:"First Thai film selected for Cannes"}
+      ]
+    },
+    "south-korea": {
+      name: "South Korea",
+      context: "38 official Oscar submissions since 1962 — one win, Parasite (2019)",
+      boxGapNote: "Ranked by admissions (KOFIC's own metric, more meaningful than converted currency given ticket-price inflation). KOFIC's tracking begins in 2004, so earlier-era hits are comparatively under-counted here.",
+      box: [
+        {t:"The Admiral: Roaring Currents", y:2014, v:"17.62M admissions"},
+        {t:"The King's Warden", y:2026, v:"16.92M admissions"},
+        {t:"Extreme Job", y:2019, v:"16.27M admissions"},
+        {t:"Along With the Gods: The Two Worlds", y:2017, v:"14.41M admissions"},
+        {t:"Ode to My Father", y:2014, v:"14.27M admissions"},
+        {t:"Veteran", y:2015, v:"13.41M admissions"},
+        {t:"12.12: The Day", y:2023, v:"13.13M admissions"},
+        {t:"The Host", y:2006, v:"13.02M admissions"},
+        {t:"The Thieves", y:2012, v:"12.98M admissions"},
+        {t:"Miracle in Cell No. 7", y:2013, v:"12.81M admissions"},
+        {t:"Assassination", y:2015, v:"12.71M admissions"},
+        {t:"The Roundup", y:2022, v:"12.69M admissions"},
+        {t:"Masquerade", y:2012, v:"12.32M admissions"},
+        {t:"King and the Clown", y:2005, v:"12.30M admissions"},
+        {t:"Along with the Gods: The Last 49 Days", y:2018, v:"12.28M admissions"},
+        {t:"A Taxi Driver", y:2017, v:"12.19M admissions"},
+        {t:"Exhuma", y:2024, v:"11.91M admissions"},
+        {t:"Taegukgi", y:2004, v:"11.75M admissions"},
+        {t:"Train to Busan", y:2016, v:"11.57M admissions"},
+        {t:"The Roundup: Punishment", y:2024, v:"11.50M admissions"},
+        {t:"The Attorney", y:2013, v:"11.38M admissions"},
+        {t:"Tidal Wave", y:2009, v:"11.32M admissions"},
+        {t:"Silmido", y:2003, v:"11.07M admissions"},
+        {t:"The Roundup: No Way Out", y:2023, v:"10.68M admissions"},
+        {t:"Parasite", y:2019, v:"10.32M admissions", link:"parasite"}
+      ],
+      recognizedGapNote: "10 real, verified entries — smaller domestic circuits (Baeksang, Blue Dragon) and non-Cannes festivals not yet incorporated.",
+      recognized: [
+        {t:"Parasite", y:2019, v:"Cannes Palme d'Or + Oscar Best Picture", note:"First non-English-language Best Picture winner; South Korea's only Oscar win of 38 submissions", link:"parasite"},
+        {t:"Pietà", y:2012, v:"Venice Golden Lion", note:"First Korean film to win a top prize at Cannes, Venice, or Berlin"},
+        {t:"Decision to Leave", y:2022, v:"Cannes Best Director", note:"Park Chan-wook; also made the 2022 Oscar shortlist"},
+        {t:"Oldboy", y:2004, v:"Cannes Grand Prix", note:"First Korean film to win the Grand Prix"},
+        {t:"Thirst", y:2009, v:"Cannes Jury Prize"},
+        {t:"Poetry", y:2010, v:"Cannes Best Screenplay"},
+        {t:"Chihwaseon (Strokes of Fire)", y:2002, v:"Cannes Best Director", note:"First-ever Cannes award for a Korean film"},
+        {t:"Burning", y:2018, v:"Oscar shortlist"},
+        {t:"Arirang", y:2011, v:"Cannes Un Certain Regard top prize", note:"Shared with Andreas Dresen's Stopped on Track"},
+        {t:"Ha Ha Ha", y:2010, v:"Cannes Un Certain Regard Prize"}
+      ]
+    },
+    japan: {
+      name: "Japan",
+      context: "73 official Oscar submissions since 1956 (plus 3 pre-competitive Honorary Awards) — 2 competitive wins: Departures (2008), Drive My Car (2021)",
+      boxGapNote: "Worldwide gross for Japanese-made films only (foreign imports excluded), per Wikipedia's sourced table — domestic-only figures from Eiren would rank differently and haven't been cross-verified yet.",
+      box: [
+        {t:"Demon Slayer: Infinity Castle", y:2025, v:"$800.4M"},
+        {t:"Demon Slayer: Mugen Train", y:2020, v:"$512.7M"},
+        {t:"Your Name", y:2016, v:"$405.3M"},
+        {t:"Spirited Away", y:2001, v:"$395.6M"},
+        {t:"Suzume", y:2022, v:"$315.0M"},
+        {t:"The Boy and the Heron", y:2023, v:"$294.2M"},
+        {t:"The First Slam Dunk", y:2022, v:"$279.0M"},
+        {t:"One Piece Film: Red", y:2022, v:"$246.5M"},
+        {t:"Howl's Moving Castle", y:2004, v:"$237.5M"},
+        {t:"Princess Mononoke", y:1997, v:"$231.3M"},
+        {t:"Ponyo", y:2008, v:"$204.8M"},
+        {t:"Weathering with You", y:2019, v:"$196.6M"},
+        {t:"Chainsaw Man – The Movie: Reze Arc", y:2025, v:"$191.4M"},
+        {t:"Jujutsu Kaisen 0", y:2021, v:"$183.8M"},
+        {t:"Stand by Me Doraemon", y:2014, v:"$183.4M"},
+        {t:"Pokémon: The First Movie", y:1998, v:"$172.7M"},
+        {t:"Bayside Shakedown 2", y:2003, v:"$164.5M"},
+        {t:"Detective Conan: One-eyed Flashback", y:2025, v:"$162.0M"},
+        {t:"Chiikawa the Movie", y:2026, v:"$159.0M"},
+        {t:"Detective Conan: The Million-dollar Pentagram", y:2024, v:"$150.0M"},
+        {t:"Arrietty", y:2010, v:"$149.7M"},
+        {t:"The Wind Rises", y:2013, v:"$136.9M"},
+        {t:"Kokuho", y:2025, v:"$134.6M"},
+        {t:"Pokémon the Movie 2000", y:1999, v:"$133.9M"},
+        {t:"Detective Conan: The Fist of Blue Sapphire", y:2019, v:"$123.0M"}
+      ],
+      recognizedGapNote: "10 real, verified entries spanning 1951–2023 — smaller festivals (Locarno, Tokyo, Shanghai) and domestic awards (Japan Academy Prize) not yet incorporated.",
+      recognized: [
+        {t:"Departures", y:2008, v:"Oscar win", note:"Best Foreign Language Film, 81st Academy Awards"},
+        {t:"Drive My Car", y:2021, v:"Oscar win", note:"Best International Feature Film, 94th Academy Awards; also a Best Picture nominee"},
+        {t:"Rashomon", y:1950, v:"Venice Golden Lion", note:"First Japanese film to win a major international prize (1951) — opened Western markets to Japanese cinema"},
+        {t:"Gate of Hell", y:1954, v:"Cannes Grand Prix", note:"Cannes' top prize before it was renamed the Palme d'Or; also won the Academy Honorary Award for Best Foreign Language Film"},
+        {t:"Kagemusha", y:1980, v:"Cannes Palme d'Or", note:"Akira Kurosawa"},
+        {t:"Shoplifters", y:2018, v:"Cannes Palme d'Or", note:"Hirokazu Kore-eda; also an Oscar nominee"},
+        {t:"Bushido, Samurai Saga", y:1963, v:"Berlin Golden Bear", note:"Shared with Gian Luigi Polidoro's To Bed or Not to Bed"},
+        {t:"Woman in the Dunes", y:1964, v:"Cannes Special Jury Prize", note:"Also a 2-time Oscar nominee"},
+        {t:"Perfect Days", y:2023, v:"Oscar nominee", note:"Kōji Yakusho won Best Actor at Cannes 2023 for this role"},
+        {t:"Confessions", y:2010, v:"Oscar shortlist"}
+      ]
+    },
+    "united-states": {
+      name: "United States",
+      context: "Ineligible for the Best International Feature Film Oscar (reserved for non-U.S. productions) — \"internationally recognized\" here means Palme d'Or, Golden Lion, and Golden Bear wins by American films instead",
+      boxGapNote: "Same 20 verified entries as the home page's all-time chart — all are American productions, so \"leaders\" and \"all-time\" happen to be the same list here.",
+      box: data.globalBox,
+      recognizedGapNote: "8 real, verified entries — Marty (1955) and a few other plausible early Palme d'Or wins aren't independently confirmed yet, so they're left out rather than guessed at.",
+      recognized: [
+        {t:"Anora", y:2024, v:"Cannes Palme d'Or", note:"Also won Best Picture at the 97th Academy Awards"},
+        {t:"Nomadland", y:2020, v:"Venice Golden Lion", note:"Also won Best Picture, Best Director, and Best Actress Oscars"},
+        {t:"The Tree of Life", y:2011, v:"Cannes Palme d'Or", note:"Terrence Malick"},
+        {t:"Pulp Fiction", y:1994, v:"Cannes Palme d'Or", note:"Quentin Tarantino"},
+        {t:"Barton Fink", y:1991, v:"Cannes Palme d'Or", note:"Also won Best Director and Best Actor at the same festival, a rare sweep"},
+        {t:"Apocalypse Now", y:1979, v:"Cannes Palme d'Or", note:"Shared with Volker Schlöndorff's The Tin Drum"},
+        {t:"Taxi Driver", y:1976, v:"Cannes Palme d'Or", note:"Martin Scorsese"},
+        {t:"Magnolia", y:2000, v:"Berlin Golden Bear", note:"Paul Thomas Anderson; the most recent American Golden Bear winner as of this writing"}
+      ]
+    },
+    "united-kingdom": {
+      name: "United Kingdom",
+      context: "20 official Oscar submissions — 2 nominations (Hedd Wyn 1992, Solomon & Gaenor 1999), both Welsh-language, no wins yet",
+      boxGapNote: "Ranked by UK box office among British productions only (co-productions and passport films like the Star Wars sequels excluded) — a shorter verified list than other countries since most \"British blockbusters\" are actually US co-productions.",
+      box: [
+        {t:"The King's Speech", y:2010, v:"£45.7M"},
+        {t:"The Inbetweeners Movie", y:2011, v:"£45.0M"},
+        {t:"The Inbetweeners 2", y:2014, v:"£33.4M"},
+        {t:"Slumdog Millionaire", y:2009, v:"£31.7M"},
+        {t:"Four Weddings and a Funeral", y:1994, v:"£27.8M"},
+        {t:"Belfast", y:2022, v:"£15.6M"},
+        {t:"Yesterday", y:2019, v:"£14.0M"},
+        {t:"Trainspotting", y:1996, v:"£12.4M"},
+        {t:"St Trinian's", y:2007, v:"£12.3M"},
+        {t:"Shirley Valentine", y:1989, v:"£11.3M"}
+      ],
+      recognizedGapNote: "8 real, verified entries spanning 1966–2016.",
+      recognized: [
+        {t:"Secrets & Lies", y:1996, v:"Cannes Palme d'Or", note:"Mike Leigh"},
+        {t:"The Wind That Shakes the Barley", y:2006, v:"Cannes Palme d'Or", note:"Ken Loach's first of two Palme d'Or wins"},
+        {t:"I, Daniel Blake", y:2016, v:"Cannes Palme d'Or", note:"Ken Loach's second Palme d'Or win"},
+        {t:"The Mission", y:1986, v:"Cannes Palme d'Or", note:"Roland Joffé"},
+        {t:"Vera Drake", y:2004, v:"Venice Golden Lion", note:"Mike Leigh"},
+        {t:"Cul-de-sac", y:1966, v:"Berlin Golden Bear", note:"Roman Polanski; British production"},
+        {t:"Solomon & Gaenor", y:1999, v:"Oscar nominee", note:"Welsh-language"},
+        {t:"Hedd Wyn", y:1992, v:"Oscar nominee", note:"First Welsh-language film to receive an Oscar nomination in this category"}
+      ]
+    },
+    france: {
+      name: "France",
+      context: "73 official Oscar submissions since 1956 (plus 3 pre-competitive Honorary Awards) — 12 competitive wins, the most of any country in this category",
+      boxGapNote: "Ranked by cinema admissions among French productions only, per Wikipedia's dedicated French-films table — foreign hits like Titanic that also topped France's all-time chart are excluded here.",
+      box: [
+        {t:"Bienvenue chez les Ch'tis", y:2008, v:"20.49M admissions"},
+        {t:"The Intouchables", y:2011, v:"19.49M admissions"},
+        {t:"La Grande Vadrouille", y:1966, v:"17.27M admissions"},
+        {t:"Asterix & Obelix: Mission Cleopatra", y:2002, v:"14.56M admissions"},
+        {t:"Les Visiteurs", y:1993, v:"13.78M admissions"},
+        {t:"Le Petit Monde de Don Camillo", y:1952, v:"12.79M admissions"},
+        {t:"Qu'est-ce qu'on a fait au Bon Dieu ?", y:2014, v:"12.37M admissions"},
+        {t:"Le Corniaud", y:1965, v:"11.74M admissions"},
+        {t:"Les Bronzés 3 : Amis pour la vie", y:2006, v:"10.36M admissions"},
+        {t:"Taxi 2", y:2000, v:"10.35M admissions"},
+        {t:"Three Men and a Cradle", y:1985, v:"10.25M admissions"},
+        {t:"Les Misérables", y:1957, v:"9.94M admissions"},
+        {t:"War of the Buttons", y:1962, v:"9.94M admissions"},
+        {t:"Le Dîner de Cons", y:1998, v:"9.25M admissions"},
+        {t:"The Big Blue", y:1988, v:"9.19M admissions"},
+        {t:"The Bear", y:1988, v:"9.14M admissions"},
+        {t:"Asterix & Obelix Take On Caesar", y:1999, v:"8.95M admissions"},
+        {t:"Emmanuelle", y:1974, v:"8.89M admissions"},
+        {t:"La Vache et le Prisonnier", y:1959, v:"8.84M admissions"},
+        {t:"Le Bataillon du ciel", y:1947, v:"8.65M admissions"},
+        {t:"Amélie", y:2001, v:"8.64M admissions"},
+        {t:"The Chorus", y:2004, v:"8.64M admissions"},
+        {t:"Nothing to Declare", y:2011, v:"8.15M admissions"},
+        {t:"Violettes impériales", y:1952, v:"8.13M admissions"},
+        {t:"The Visitors II: The Corridors of Time", y:1998, v:"8.04M admissions"}
+      ],
+      recognizedGapNote: "10 real, verified entries — France's 12 Oscar wins include several from the 1950s–80s not yet cross-checked in as much depth as the ones listed here.",
+      recognized: [
+        {t:"Anatomy of a Fall", y:2023, v:"Cannes Palme d'Or", note:"Justine Triet; also an Oscar nominee for Best Picture and Best Director"},
+        {t:"A Man and a Woman", y:1966, v:"Cannes Palme d'Or + Oscar win", note:"Won the Palme d'Or (shared) and the Oscar for Best Foreign Language Film the same year"},
+        {t:"Titane", y:2021, v:"Cannes Palme d'Or", note:"Julia Ducournau"},
+        {t:"Blue Is the Warmest Colour", y:2013, v:"Cannes Palme d'Or", note:"Abdellatif Kechiche"},
+        {t:"Dheepan", y:2015, v:"Cannes Palme d'Or", note:"Jacques Audiard"},
+        {t:"Day for Night", y:1973, v:"Oscar win", note:"Best Foreign Language Film; François Truffaut"},
+        {t:"Indochine", y:1992, v:"Oscar win", note:"Best Foreign Language Film; France's most recent competitive Oscar win in this category"},
+        {t:"The Discreet Charm of the Bourgeoisie", y:1972, v:"Oscar win", note:"Best Foreign Language Film; Luis Buñuel"},
+        {t:"Mon Oncle", y:1958, v:"Oscar win", note:"Best Foreign Language Film; Jacques Tati"},
+        {t:"Emilia Pérez", y:2024, v:"Oscar nominee", note:"Also won the Cannes Jury Prize and a shared Best Actress award in 2024"}
+      ]
+    },
+    germany: {
+      name: "Germany",
+      context: "67 official Oscar submissions since 1956 (36 as Germany, 31 as West Germany) — 4 competitive wins: The Tin Drum (1979), Nowhere in Africa (2001), The Lives of Others (2006), All Quiet on the Western Front (2022)",
+      boxGapNote: "Wikipedia's German-productions table only tracks a handful of titles in real depth — mixes euro gross (post-2002 releases) with admissions (older ones, predating the euro), each labeled by which metric is shown. Shorter than other countries' lists because that's genuinely all that's been verified so far.",
+      box: [
+        {t:"Der Schuh des Manitu", y:2001, v:"€65.1M"},
+        {t:"Fack ju Göhte 2", y:2015, v:"€63.1M"},
+        {t:"Honig im Kopf", y:2014, v:"€58.8M"},
+        {t:"Fack ju Göhte", y:2013, v:"€55.0M"},
+        {t:"Fack ju Göhte 3", y:2017, v:"€53.4M"},
+        {t:"Traumschiff Surprise – Periode 1", y:2004, v:"€51.3M"},
+        {t:"The Perfect Secret", y:2019, v:"€47.0M"},
+        {t:"Keinohrhasen", y:2007, v:"€40.5M"},
+        {t:"Good Bye, Lenin!", y:2003, v:"€39.0M"},
+        {t:"Treasure of Silver Lake", y:1962, v:"10.0M admissions"},
+        {t:"Apache Gold", y:1963, v:"10.0M admissions"},
+        {t:"Otto – Der Film", y:1985, v:"8.78M admissions"}
+      ],
+      recognizedGapNote: "6 real, verified entries — no confirmed German Golden Lion (Venice) win found yet, so that festival isn't represented here.",
+      recognized: [
+        {t:"All Quiet on the Western Front", y:2022, v:"Oscar win", note:"Best International Feature Film, 95th Academy Awards"},
+        {t:"The Lives of Others", y:2006, v:"Oscar win", note:"Best Foreign Language Film, 79th Academy Awards"},
+        {t:"Nowhere in Africa", y:2001, v:"Oscar win", note:"Caroline Link"},
+        {t:"The Tin Drum", y:1979, v:"Cannes Palme d'Or + Oscar win", note:"Shared the Palme d'Or with Apocalypse Now, then won the Oscar for Best Foreign Language Film"},
+        {t:"Paris, Texas", y:1984, v:"Cannes Palme d'Or", note:"Wim Wenders"},
+        {t:"Head-On", y:2004, v:"Berlin Golden Bear", note:"Fatih Akin; first German film to win since 1986"}
+      ]
+    },
+    italy: {
+      name: "Italy",
+      context: "72 official Oscar submissions since 1947 — 14 wins (11 competitive + 3 pre-competitive Honorary Awards), the most of any country in this category",
+      boxGapNote: "10 real, verified entries from Wikipedia's Italian-productions table — shorter than some other countries' lists because that's as far as the sourced table goes.",
+      box: [
+        {t:"Buen Camino", y:2025, v:"€76.6M"},
+        {t:"Quo Vado?", y:2016, v:"€65.4M"},
+        {t:"Sole a catinelle", y:2013, v:"€51.9M"},
+        {t:"Tolo Tolo", y:2020, v:"€46.2M"},
+        {t:"What a Beautiful Day", y:2011, v:"€43.5M"},
+        {t:"There's Still Tomorrow", y:2023, v:"€36.8M"},
+        {t:"Life Is Beautiful", y:1997, v:"€31.2M"},
+        {t:"Benvenuti al Sud", y:2010, v:"€29.8M"},
+        {t:"Ask Me If I'm Happy", y:2000, v:"€28.5M"},
+        {t:"Christmas on the Nile", y:2002, v:"€28.3M"}
+      ],
+      recognizedGapNote: "10 of Italy's 14 Oscar wins are listed here, spanning 1947–2013 — Federico Fellini alone accounts for 4 of them, the most of any director in this category's history.",
+      recognized: [
+        {t:"La Strada", y:1956, v:"Oscar win", note:"Best Foreign Language Film; Federico Fellini's first of four wins in this category"},
+        {t:"Nights of Cabiria", y:1957, v:"Oscar win", note:"Federico Fellini"},
+        {t:"8½", y:1963, v:"Oscar win", note:"Federico Fellini"},
+        {t:"Amarcord", y:1974, v:"Oscar win", note:"Federico Fellini's fourth win — the most of any director in this category"},
+        {t:"Yesterday, Today and Tomorrow", y:1964, v:"Oscar win", note:"Vittorio De Sica"},
+        {t:"The Garden of the Finzi-Continis", y:1971, v:"Oscar win", note:"Vittorio De Sica"},
+        {t:"Cinema Paradiso", y:1989, v:"Oscar win", note:"Giuseppe Tornatore"},
+        {t:"Life Is Beautiful", y:1998, v:"Oscar win", note:"Roberto Benigni; also Italy's highest-grossing film worldwide"},
+        {t:"The Great Beauty", y:2013, v:"Oscar win", note:"Paolo Sorrentino; Italy's most recent win in this category"},
+        {t:"The Bicycle Thief", y:1949, v:"Honorary Academy Award", note:"Vittorio De Sica; from the pre-competitive era before the category existed"}
+      ]
+    },
+    spain: {
+      name: "Spain",
+      context: "68 official Oscar submissions — 4 wins: Begin the Beguine (1982), Belle Époque (1993), All About My Mother (1999), The Sea Inside (2004)",
+      boxGapNote: "10 real, verified entries from Wikipedia's Spanish box office table.",
+      box: [
+        {t:"Spanish Affair", y:2014, v:"€56.2M"},
+        {t:"The Impossible", y:2012, v:"€42.4M"},
+        {t:"Spanish Affair 2", y:2015, v:"€36.1M"},
+        {t:"The Others", y:2001, v:"€27.3M"},
+        {t:"A Monster Calls", y:2016, v:"€26.5M"},
+        {t:"The Orphanage", y:2007, v:"€25.1M"},
+        {t:"Mortadelo & Filemon: The Big Adventure", y:2003, v:"€22.8M"},
+        {t:"Torrente 2: Mission in Marbella", y:2001, v:"€22.1M"},
+        {t:"Agora", y:2009, v:"€21.4M"},
+        {t:"Perfect Strangers", y:2017, v:"€21.3M"}
+      ],
+      recognizedGapNote: "6 real, verified entries — no confirmed Spanish Palme d'Or (Cannes) win found yet, so that festival isn't represented here.",
+      recognized: [
+        {t:"The Sea Inside", y:2004, v:"Oscar win", note:"Alejandro Amenábar"},
+        {t:"All About My Mother", y:1999, v:"Oscar win", note:"Pedro Almodóvar"},
+        {t:"Belle Époque", y:1993, v:"Oscar win", note:"Fernando Trueba"},
+        {t:"Begin the Beguine", y:1982, v:"Oscar win", note:"José Luis Garci"},
+        {t:"The Room Next Door", y:2024, v:"Venice Golden Lion", note:"Pedro Almodóvar's first top prize at Cannes, Venice, or Berlin after six Cannes competition entries"},
+        {t:"Alcarràs", y:2022, v:"Berlin Golden Bear", note:"Carla Simón"}
+      ]
+    },
+    sweden: {
+      name: "Sweden",
+      context: "66 official Oscar submissions since 1956 — 3 wins, all directed by Ingmar Bergman, who represented Sweden a record nine times",
+      boxGapNote: "No comprehensive official all-time Swedish box office chart was found in English-language sources (unlike KOFIC or CNC) — these are the handful of individually-confirmed high performers, not a complete ranked list.",
+      box: [
+        {t:"The Girl with the Dragon Tattoo", y:2009, v:"$104M", note:"Worldwide gross; Guinness-recorded record for a Swedish film"},
+        {t:"A Man Called Ove", y:2015, v:"1.7M admissions", note:"Reported as Sweden's third most successful domestic film"},
+        {t:"The Hundred-Year-Old Man Who Climbed Out the Window and Disappeared", y:2013, v:"1M+ admissions", note:"Opening-month figure only — final total not yet confirmed"}
+      ],
+      recognizedGapNote: "4 real, verified entries — all Ingmar Bergman films, reflecting how much of Sweden's international recognition concentrates in one director's career.",
+      recognized: [
+        {t:"Fanny and Alexander", y:1983, v:"Oscar win", note:"Ingmar Bergman's third and final win in this category"},
+        {t:"Through a Glass Darkly", y:1961, v:"Oscar win", note:"Ingmar Bergman"},
+        {t:"The Virgin Spring", y:1960, v:"Oscar win", note:"Ingmar Bergman's first win in this category"},
+        {t:"The Seventh Seal", y:1957, v:"Cannes Special Jury Prize", note:"Shared with Poland's Kanal; helped establish the idea of international art cinema"}
+      ]
+    },
+    denmark: {
+      name: "Denmark",
+      context: "63 official Oscar submissions since 1956 — 4 wins: Babette's Feast (1987), Pelle the Conqueror (1988), In a Better World (2010), Another Round (2020)",
+      boxGapNote: "Only 2 real, verified entries — no comprehensive official Danish box office chart was found in English-language sources; the Department Q franchise is reported to dominate the domestic chart but individual film figures weren't confirmed.",
+      box: [
+        {t:"The Purity of Vengeance", y:2018, v:"0.73M admissions", note:"$11.1M; highest-grossing Danish film at the local box office, 4th in the Department Q franchise"},
+        {t:"A Royal Affair", y:2012, v:"$6.5M"}
+      ],
+      recognizedGapNote: "5 real, verified entries.",
+      recognized: [
+        {t:"Another Round", y:2020, v:"Oscar win", note:"Best International Feature Film; Thomas Vinterberg"},
+        {t:"In a Better World", y:2010, v:"Oscar win", note:"Susanne Bier"},
+        {t:"Pelle the Conqueror", y:1988, v:"Oscar win", note:"Bille August; a Swedish–Danish co-production submitted by Denmark"},
+        {t:"Babette's Feast", y:1987, v:"Oscar win", note:"Denmark's first win in this category"},
+        {t:"Dancer in the Dark", y:2000, v:"Cannes Palme d'Or", note:"Lars von Trier; Björk won Best Actress the same year"}
+      ]
+    },
+    norway: {
+      name: "Norway",
+      context: "48 official Oscar submissions since 1957 — 1 win: Sentimental Value (2025), Norway's only competitive win in this category so far",
+      boxGapNote: "Only 3 real, verified entries — no comprehensive official Norwegian box office chart was found in English-language sources.",
+      box: [
+        {t:"Galapagos", y:1955, v:"$17.7M", note:"Thor Heyerdahl documentary; Guinness-recorded highest-grossing Norwegian film"},
+        {t:"Mother's Elling", y:2003, v:"$3.3M"},
+        {t:"Hard Asphalt", y:1986, v:"$1.4M"}
+      ],
+      recognizedGapNote: "2 real, verified entries — Norway's international profile has risen sharply only in the last few years, concentrated around Joachim Trier's recent films.",
+      recognized: [
+        {t:"Sentimental Value", y:2025, v:"Oscar win", note:"Joachim Trier; Norway's first and only competitive win in this category"},
+        {t:"The Worst Person in the World", y:2021, v:"Cannes Best Actress", note:"Joachim Trier; Renate Reinsve became the first Norwegian actress to win an award at Cannes; also an Oscar nominee"}
+      ]
+    },
+    finland: {
+      name: "Finland",
+      context: "40 official Oscar submissions since 1973 — 0 wins, 1 nomination (The Man Without a Past, 2002) — Finland's director Aki Kaurismäki twice withdrew his own selected films from competition in protest",
+      boxGapNote: "Only 2 real, verified entries — no comprehensive official Finnish box office chart was found in English-language sources.",
+      box: [
+        {t:"The Man Without a Past", y:2002, v:"$9.6M", note:"Worldwide gross; Guinness-recorded highest-grossing Finnish film"},
+        {t:"Bad Boys", y:2003, v:"$4.78M", note:"Second-most-successful film in Finnish theatres in 2003, after The Return of the King"}
+      ],
+      recognizedGapNote: "4 real, verified entries — all involve Aki Kaurismäki, who accounts for effectively all of Finland's major-festival profile.",
+      recognized: [
+        {t:"The Man Without a Past", y:2002, v:"Cannes Grand Prix", note:"Aki Kaurismäki; also earned Finland's only Oscar nomination in this category, out of 40 submissions"},
+        {t:"Fallen Leaves", y:2023, v:"Cannes Jury Prize", note:"Aki Kaurismäki"},
+        {t:"Drifting Clouds", y:1996, v:"Selected for Oscars, then withdrawn", note:"Kaurismäki withdrew his own selected film from competition in protest"},
+        {t:"Lights in the Dusk", y:2006, v:"Selected for Oscars, then withdrawn", note:"Kaurismäki withdrew again, the same act of protest a decade later"}
+      ]
+    },
+    iran: {
+      name: "Iran",
+      context: "Iran's internationally celebrated films are often the ones banned domestically, made without state authorization, or smuggled out of the country entirely — several directors below were imprisoned or banned from filmmaking for this work. The two tabs here show almost entirely different films: commercially popular domestic cinema that plays in Iranian theaters, and separately, internationally acclaimed cinema that rarely overlaps with it.",
+      boxGapNote: "25 real, verified entries, all 2021–2025 releases — figures are in Iranian rials, shown as reported rather than converted to dollars, since rial has lost most of its value to inflation over this period and no reliable exchange rate per release date was verified. None of these films appear on the internationally recognized tab.",
+      box: [
+        {t:"Seventy Thirty", y:2024, v:"3.60T rials"},
+        {t:"Fossil", y:2023, v:"3.25T rials"},
+        {t:"Hotel", y:2023, v:"2.77T rials"},
+        {t:"Texas 3", y:2024, v:"2.49T rials"},
+        {t:"Pressure Cooker", y:2024, v:"2.30T rials"},
+        {t:"Bloody Alligator", y:2024, v:"1.68T rials"},
+        {t:"Breakfast with Giraffes", y:2024, v:"1.21T rials"},
+        {t:"Intoxicated by Love", y:2024, v:"1.20T rials"},
+        {t:"Dinosaur", y:2025, v:"1.15T rials"},
+        {t:"Pool & Party", y:2024, v:"912B rials"},
+        {t:"Don't Be Embarrassed 2", y:2024, v:"862B rials"},
+        {t:"Hawaii", y:2024, v:"835B rials"},
+        {t:"Lawless City", y:2023, v:"776B rials"},
+        {t:"Solitary", y:2022, v:"775B rials"},
+        {t:"Babaei the Hero", y:2024, v:"679B rials"},
+        {t:"Year of the Cat", y:2024, v:"646B rials"},
+        {t:"Beach Villa", y:2023, v:"636B rials"},
+        {t:"Extinction: A Journey to be a Real Hero", y:2023, v:"625B rials"},
+        {t:"Dynamite", y:2021, v:"588B rials"},
+        {t:"Bucharest", y:2022, v:"548B rials"},
+        {t:"Moses the Kalimullah: At Dawn", y:2025, v:"540B rials"},
+        {t:"Bodiless", y:2024, v:"465B rials"},
+        {t:"Molotov Cocktail", y:2024, v:"461B rials"},
+        {t:"The Crab", y:2023, v:"422B rials"},
+        {t:"Sag Band", y:2022, v:"421B rials"}
+      ],
+      recognizedGapNote: "7 real, verified entries — whether each film ever had a domestic Iranian release is noted per title, since several didn't.",
+      recognized: [
+        {t:"A Separation", y:2011, v:"Oscar win", note:"Asghar Farhadi; Iran's first-ever Oscar win in this category"},
+        {t:"The Salesman", y:2016, v:"Oscar win", note:"Asghar Farhadi's second win; he skipped the ceremony in protest of that era's U.S. travel ban on Iranians"},
+        {t:"It Was Just an Accident", y:2025, v:"Cannes Palme d'Or", note:"Jafar Panahi, repeatedly imprisoned and banned from filmmaking in Iran; made without state authorization"},
+        {t:"Taste of Cherry", y:1997, v:"Cannes Palme d'Or", note:"Abbas Kiarostami (shared with Japan's The Eel); Iran's first Palme d'Or"},
+        {t:"Taxi", y:2015, v:"Berlin Golden Bear", note:"Jafar Panahi, shot in secret during an official 20-year filmmaking ban; not released in Iranian theaters"},
+        {t:"There Is No Evil", y:2020, v:"Berlin Golden Bear", note:"Mohammad Rasoulof, made in secret; Rasoulof was imprisoned by Iranian authorities and could not attend"},
+        {t:"This Is Not a Film", y:2011, v:"Smuggled to Cannes", note:"Jafar Panahi, filmed under house arrest during his filmmaking ban; smuggled out of Iran on a USB drive, reportedly hidden inside a cake"}
+      ]
+    }
+  };
+
+  var movies = {
+    "how-to-make-millions-before-grandma-dies": {
+      title: "How to make millions before grandma dies",
+      country: "Thailand",
+      countrySlug: "thailand",
+      year: 2024,
+      genre: "Comedy, drama",
+      badges: ["Highest-grossing Thai-language film ever", "First Thai film to reach the Oscar shortlist"],
+      stats: [
+        { label: "Domestic box office (Thailand)", value: "฿172.7M", sub: "≈ $4.9M" },
+        { label: "Worldwide box office", value: "$73.8M" },
+        { label: "Budget", value: "$1M" },
+        { label: "Revenue to budget", value: "73.8×", sub: "gross revenue, not profit" }
+      ],
+      awards: [
+        { k: "Submitted", v: "2024, for the 97th Academy Awards" },
+        { k: "Category", v: "Best International Feature Film" },
+        { k: "Result", v: "Made the December 2024 shortlist" },
+        { k: "Significance", v: "Thailand's first-ever shortlist placement, of 24 submissions since 1984" }
+      ]
+    },
+    parasite: {
+      title: "Parasite",
+      country: "South Korea",
+      countrySlug: "south-korea",
+      year: 2019,
+      genre: "Comedy, drama, thriller",
+      badges: ["First non-English-language film to win the Best Picture Oscar", "Winner of both the Palme d'Or and Best Picture — only the second film ever to do so"],
+      stats: [
+        { label: "Domestic box office (South Korea)", value: "10.3M admissions", sub: "≈ $71.4M" },
+        { label: "Worldwide box office", value: "$258.1M" },
+        { label: "Budget", value: "$11.4M" },
+        { label: "Revenue to budget", value: "22.6×", sub: "gross revenue, not profit" }
+      ],
+      awards: [
+        { k: "Cannes", v: "2019, Palme d'Or (unanimous jury decision)" },
+        { k: "Submitted", v: "2019, for the 92nd Academy Awards" },
+        { k: "Category", v: "Best International Feature Film" },
+        { k: "Result", v: "Won — also won Best Picture, Best Director, Best Original Screenplay" },
+        { k: "Significance", v: "South Korea's only Oscar win of 38 submissions since 1962" }
+      ]
+    }
+  };
+
+  renderList('panel-global-box', data.globalBox, null, 20);
+  renderList('panel-global-thisweek', data.globalThisWeek, "Weekend of Sep 4, 2026 — the most recent full weekend chart sourced. A live build would refresh this automatically.");
+  renderList('panel-global-imdb', data.globalImdb, null, 20);
+  renderList('panel-global-picture', data.globalPicture, null, 20);
+  renderList('panel-global-palme', data.globalPalme, null, 20);
+  renderList('panel-global-lion', data.globalLion, "2009–2017 and 2024 aren't independently verified yet — shown once sourced, not filled with placeholders.");
+  renderList('panel-global-bear', data.globalBear, "2018, 2019, 2023–2025 aren't independently verified yet — shown once sourced, not filled with placeholders.");
+
+  var allSearchable = Object.keys(countries).reduce(function(acc, slug){
+    return acc.concat(
+      countries[slug].box.map(function(i){ return {i:i, kind:'box'}; }),
+      countries[slug].recognized.map(function(i){ return {i:i, kind:'recognized'}; })
+    );
+  }, data.globalBox.map(function(i){ return {i:i, kind:'box'}; }).concat(data.globalImdb.map(function(i){ return {i:i, kind:'box'}; })))
+    .map(function(x){ return {t:x.i.t, link:movieLink(x.i, x.kind)}; })
+    .filter(function(v,i,arr){ return arr.findIndex(function(x){return x.t===v.t;})===i; });
+
+  function findCuratedSlugByTitle(title) {
+    var q = title.toLowerCase();
+    for (var slug in movies) {
+      if (movies[slug].title.toLowerCase() === q) return slug;
+    }
+    return null;
+  }
+
+  var searchDebounce = null;
+  function onSearch(val) {
+    var dd = document.getElementById('dropdown');
+    if (!val) { dd.classList.remove('show'); clearTimeout(searchDebounce); return; }
+    var q = val.toLowerCase();
+    var curatedMatches = allSearchable.filter(function(i){ return i.t.toLowerCase().indexOf(q)>-1; }).slice(0,5);
+    renderDropdown(curatedMatches.map(function(c){
+      return { title: c.t, year: null, country: null, director: null, cast: [], posterThumbUrl: null, link: c.link };
+    }));
+
+    clearTimeout(searchDebounce);
+    if (val.length < 2) return;
+    searchDebounce = setTimeout(function(){
+      // Not restricted to any one language — searches every TMDB title, including native-script queries
+      // (e.g. "올드보이" matches Oldboy), so this scales to every country as more get curated.
+      fetch('/api/search-movies?q=' + encodeURIComponent(val))
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          var live = (data.results || []).map(function(m){
+            var curatedSlug = findCuratedSlugByTitle(m.title);
+            return {
+              title: m.title, year: m.year, country: m.country, director: m.director, cast: m.cast,
+              posterThumbUrl: m.posterThumbUrl, link: curatedSlug || ('tmdb:' + m.id)
+            };
+          });
+          var curatedEnriched = curatedMatches.map(function(c){
+            var liveMatch = live.filter(function(l){ return l.title.toLowerCase() === c.t.toLowerCase(); })[0];
+            return liveMatch || { title: c.t, year: null, country: null, director: null, cast: [], posterThumbUrl: null, link: c.link };
+          });
+          var rest = live.filter(function(l){
+            return !curatedEnriched.some(function(c){ return c.title.toLowerCase() === l.title.toLowerCase(); });
+          });
+          renderDropdown(curatedEnriched.concat(rest).slice(0, 8));
+        })
+        .catch(function(){});
+    }, 300);
+  }
+  function renderDropdown(matches) {
+    var dd = document.getElementById('dropdown');
+    if (!matches.length) { dd.classList.remove('show'); return; }
+    dd.innerHTML = matches.map(function(m){
+      var meta = [m.country, m.director ? ('Dir. ' + m.director) : null].filter(Boolean).join(' · ');
+      return '<div class="item" onclick="pickSearch(\''+m.link+'\')">'+
+        '<div class="item-poster" style="'+(m.posterThumbUrl ? 'background-image:url('+m.posterThumbUrl+')' : '')+'"></div>'+
+        '<div class="item-info">'+
+          '<div class="item-title">'+m.title+(m.year ? ' <span class="item-year">('+m.year+')</span>' : '')+'</div>'+
+          (meta ? '<div class="item-meta">'+meta+'</div>' : '')+
+          (m.cast && m.cast.length ? '<div class="item-cast">'+m.cast.join(', ')+'</div>' : '')+
+        '</div></div>';
+    }).join('');
+    dd.classList.add('show');
+  }
+  function pickSearch(link) {
+    document.getElementById('dropdown').classList.remove('show');
+    if (link) showView('movie', link);
+  }
+  document.addEventListener('click', function(e){
+    if (!e.target.closest('.search-wrap')) document.getElementById('dropdown').classList.remove('show');
+  });
+</script>
+
+</body>
+</html>
