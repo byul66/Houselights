@@ -1,13 +1,16 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const OMDB_API_KEY = process.env.OMDB_API_KEY;
 const PORT = process.env.PORT || 3000;
 
 const app = express();
-app.use(express.static(path.join(__dirname, 'public')));
+// index:false so "/" falls through to our own handler below instead of being
+// auto-served — that handler is what injects per-page Open Graph tags.
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 // In-memory cache so repeated page loads/searches don't burn API quota.
 const cache = new Map();
@@ -306,10 +309,89 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// SPA fallback: client-side routes like /country/thailand or /movie/parasite aren't
-// real files, so serve the app shell and let the front-end JS render the right view.
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// SPA shell with per-route Open Graph tags. Client-side routes like /country/thailand
+// or /movie/parasite aren't real files — the front-end JS renders the actual view — but
+// link-preview bots (Twitter/Discord/iMessage/etc.) only read the raw HTML we send back,
+// so each route gets its own title/description/image injected server-side before that.
+const INDEX_HTML = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+const SITE_DESCRIPTION = 'Movie data by country — box office, budget, and international recognition, sourced honestly. Never invented, always verified.';
+
+const COUNTRY_NAMES = {
+  thailand: 'Thailand', 'south-korea': 'South Korea', japan: 'Japan',
+  'united-states': 'United States', 'united-kingdom': 'United Kingdom', france: 'France',
+  germany: 'Germany', italy: 'Italy', spain: 'Spain', iran: 'Iran',
+  sweden: 'Sweden', denmark: 'Denmark', norway: 'Norway', finland: 'Finland'
+};
+
+const CURATED_MOVIES = {
+  parasite: { title: 'Parasite', country: 'South Korea' },
+  'how-to-make-millions-before-grandma-dies': { title: 'How to make millions before grandma dies', country: 'Thailand' }
+};
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+async function resolveMovieMeta(slug) {
+  if (CURATED_MOVIES[slug]) {
+    const c = CURATED_MOVIES[slug];
+    const poster = await lookupTmdbPoster(c.title).catch(() => ({ url: null }));
+    return { title: c.title, country: c.country, image: poster.url };
+  }
+  if (slug.indexOf('tmdb:') === 0) {
+    const t = await getTmdbDetails(slug.slice(5)).catch(() => null);
+    return t ? { title: t.title, country: t.country, image: t.posterUrl } : null;
+  }
+  if (slug.indexOf('title:') === 0) {
+    const parts = slug.slice(6).split('|');
+    const title = decodeURIComponent(parts[0] || '');
+    const year = parts[1] || '';
+    if (!TMDB_API_KEY) return { title, country: null, image: null };
+    const params = new URLSearchParams({ api_key: TMDB_API_KEY, query: title });
+    if (year) params.set('year', year);
+    const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?${params}`).catch(() => null);
+    const searchData = searchRes && searchRes.ok ? await searchRes.json() : null;
+    const match = searchData && searchData.results && searchData.results[0];
+    if (!match) return { title, country: null, image: null };
+    const t = await getTmdbDetails(match.id).catch(() => null);
+    return t ? { title: t.title, country: t.country, image: t.posterUrl } : { title, country: null, image: null };
+  }
+  return null;
+}
+
+app.get('*', async (req, res) => {
+  const siteUrl = `${req.protocol}://${req.get('host')}`;
+  let title = 'Houselights';
+  let description = SITE_DESCRIPTION;
+  let image = `${siteUrl}/og-default.png`;
+
+  const countryMatch = req.path.match(/^\/country\/([^/]+)$/);
+  const movieMatch = req.path.match(/^\/movie\/([^/]+)$/);
+
+  if (countryMatch) {
+    const name = COUNTRY_NAMES[decodeURIComponent(countryMatch[1])];
+    if (name) {
+      title = `${name} — Houselights`;
+      description = `Box office leaders and internationally recognized films from ${name}, sourced honestly on Houselights.`;
+    }
+  } else if (movieMatch) {
+    const meta = await resolveMovieMeta(decodeURIComponent(movieMatch[1])).catch(() => null);
+    if (meta) {
+      title = `${meta.title} — Houselights`;
+      description = meta.country
+        ? `${meta.country} — verified box office, budget, and international recognition on Houselights.`
+        : SITE_DESCRIPTION;
+      if (meta.image) image = meta.image;
+    }
+  }
+
+  const html = INDEX_HTML
+    .split('__OG_TITLE__').join(escapeHtml(title))
+    .split('__OG_DESCRIPTION__').join(escapeHtml(description))
+    .split('__OG_IMAGE__').join(image)
+    .split('__OG_URL__').join(siteUrl + req.path);
+
+  res.send(html);
 });
 
 app.listen(PORT, () => {
