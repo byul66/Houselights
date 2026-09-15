@@ -48,7 +48,12 @@ async function lookupOmdbRating(title, year) {
   if (data.Response === 'False' || !data.imdbRating || data.imdbRating === 'N/A') {
     return { rating: null, reason: data.Error || `No OMDb rating found for "${title}"` };
   }
-  return { rating: data.imdbRating, imdbId: data.imdbID, source: 'omdb' };
+  return {
+    rating: data.imdbRating,
+    imdbId: data.imdbID,
+    source: 'omdb',
+    awards: data.Awards && data.Awards !== 'N/A' ? data.Awards : null
+  };
 }
 
 app.get('/api/movie-data', async (req, res) => {

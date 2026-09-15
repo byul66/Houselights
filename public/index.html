@@ -601,8 +601,9 @@
           return '<div class="stat"><div class="label">'+s.label+'</div><div class="value">'+s.value+'</div>'+(s.sub?'<div class="sub">'+s.sub+'</div>':'')+'</div>';
         }).join('');
 
-        document.getElementById('movieAwards').innerHTML = query.knownRecognition
-          ? '<div class="recog-row"><span class="k">Recognition</span><span>'+query.knownRecognition+'</span></div>'
+        var recognitionText = query.knownRecognition || (data.imdb && data.imdb.awards);
+        document.getElementById('movieAwards').innerHTML = recognitionText
+          ? '<div class="recog-row"><span class="k">Recognition</span><span>'+recognitionText+'</span></div>'
           : '<div class="recog-row"><span class="k">Recognition</span><span>Not independently researched for this title yet — shown once verified, not filled with placeholders.</span></div>';
 
         renderWatchBox(data.watch);
