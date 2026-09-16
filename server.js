@@ -161,7 +161,10 @@ app.get('/api/movie-data', async (req, res) => {
   ]);
 
   const result = { poster, imdb, watch };
-  cache.set(cacheKey, result);
+  // Don't cache a failed OMDb lookup — the in-memory cache has no expiry, so caching a
+  // transient failure (e.g. OMDb's free-tier daily request cap, which resets on its own)
+  // would keep serving "Not available" long after the underlying data is fetchable again.
+  if (imdb.rating) cache.set(cacheKey, result);
   res.json(result);
 });
 
@@ -337,7 +340,10 @@ app.get('/api/top-imdb', async (req, res) => {
 
   const results = enriched.filter(Boolean).sort((a, b) => parseFloat(b.imdbRating) - parseFloat(a.imdbRating));
   const result = { results, page, totalPages: data.total_pages || 1 };
-  cache.set(cacheKey, result);
+  // As above: an empty page is far more likely to mean every OMDb call in this batch failed
+  // (e.g. hit OMDb's free-tier daily cap) than that literally zero candidates clear the
+  // rating floor, so don't let a transient failure get cached forever.
+  if (results.length) cache.set(cacheKey, result);
   res.json(result);
 });
 
