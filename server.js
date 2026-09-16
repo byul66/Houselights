@@ -5,6 +5,11 @@ const fs = require('fs');
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const OMDB_API_KEY = process.env.OMDB_API_KEY;
+// Supabase's "anon" key is meant to be public/client-exposed — it's safe to ship to the
+// browser because every table it can reach is locked down with Row Level Security. It's
+// still read from .env (not hardcoded) so per-environment config stays in one place.
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 const PORT = process.env.PORT || 3000;
 
 const app = express();
@@ -433,6 +438,14 @@ function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// For substituting into a double-quoted JS string literal in the page's <head> (not HTML
+// text), so this escapes quotes/backslashes rather than HTML entities. JSON.stringify
+// already produces a correctly-escaped double-quoted string — slicing off its outer quotes
+// gives just the escaped inner content to drop into our own quotes.
+function jsStringLiteral(str) {
+  return JSON.stringify(String(str)).slice(1, -1);
+}
+
 async function resolveMovieMeta(slug) {
   if (CURATED_MOVIES[slug]) {
     const c = CURATED_MOVIES[slug];
@@ -487,7 +500,9 @@ app.get('*', async (req, res) => {
     .split('__OG_TITLE__').join(escapeHtml(title))
     .split('__OG_DESCRIPTION__').join(escapeHtml(description))
     .split('__OG_IMAGE__').join(image)
-    .split('__OG_URL__').join(siteUrl + req.path);
+    .split('__OG_URL__').join(siteUrl + req.path)
+    .split('__SUPABASE_URL__').join(jsStringLiteral(SUPABASE_URL))
+    .split('__SUPABASE_ANON_KEY__').join(jsStringLiteral(SUPABASE_ANON_KEY));
 
   res.send(html);
 });
@@ -496,4 +511,5 @@ app.listen(PORT, () => {
   console.log(`Houselights running at http://localhost:${PORT}`);
   if (!TMDB_API_KEY) console.log('  TMDB_API_KEY not set — posters will fall back to placeholders.');
   if (!OMDB_API_KEY) console.log('  OMDB_API_KEY not set — IMDb ratings will fall back to placeholders.');
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) console.log('  SUPABASE_URL/SUPABASE_ANON_KEY not set — sign-in and journal features will stay hidden.');
 });

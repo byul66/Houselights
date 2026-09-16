@@ -14,6 +14,14 @@
 <meta name="twitter:title" content="__OG_TITLE__">
 <meta name="twitter:description" content="__OG_DESCRIPTION__">
 <meta name="twitter:image" content="__OG_IMAGE__">
+<script>
+  // Injected server-side (server.js) from SUPABASE_URL/SUPABASE_ANON_KEY in .env. Both stay
+  // empty strings until that's configured, which the app treats as "sign-in not available
+  // yet" rather than erroring — see initSupabase() below.
+  window.SUPABASE_URL = "__SUPABASE_URL__";
+  window.SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY__";
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -57,6 +65,23 @@
   .dropdown .item-year { font-weight: 400; color: var(--text-muted); }
   .dropdown .item-meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
   .dropdown .item-cast { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  .header-controls { display: flex; align-items: center; gap: 14px; }
+  .auth-wrap { position: relative; }
+  .auth-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--border); color: var(--text-muted); font-family: inherit; font-size: 13px; padding: 8px 14px; border-radius: 20px; cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease; }
+  .auth-btn:hover { border-color: var(--teal-dim); color: var(--teal); }
+  .auth-btn.signed-in { color: var(--teal); border-color: var(--teal-dim); }
+  .auth-menu { position: absolute; top: calc(100% + 6px); right: 0; min-width: 220px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; display: none; z-index: 20; box-shadow: 0 12px 28px rgba(0,0,0,0.45); }
+  .auth-menu.show { display: block; }
+  .auth-menu-item { padding: 10px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border); }
+  .auth-menu-item:last-child { border-bottom: none; }
+  .auth-menu-item:hover { background: var(--surface); color: var(--teal); }
+  .auth-menu-divider { padding: 8px 14px; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid var(--border); text-align: center; }
+  .auth-menu-email { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .auth-menu-email input { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 7px 10px; color: var(--text); font-size: 13px; width: 100%; font-family: inherit; margin-bottom: 6px; }
+  .auth-menu-email button { width: 100%; background: none; border: 1px solid var(--teal-dim); color: var(--teal); font-family: inherit; font-size: 12px; padding: 7px 10px; border-radius: 5px; cursor: pointer; }
+  .auth-menu-email button:hover { background: rgba(45,212,191,0.08); }
+  .auth-menu-note { padding: 10px 14px; font-size: 12px; color: var(--text-muted); }
 
   main { padding: 80px 0 80px; }
   .view { display: none; animation: fade 0.4s ease; }
@@ -110,9 +135,12 @@
   .poster .init { position: absolute; bottom: 14px; left: 14px; font-size: 13px; color: rgba(255,255,255,0.55); letter-spacing: 0.5px; }
   .meta-line { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; }
   .title { font-size: 27px; font-weight: 700; line-height: 1.2; margin: 0 0 14px; max-width: 460px; }
+  .action-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .action-row .share-wrap { margin-bottom: 0; }
   .share-wrap { position: relative; display: inline-block; margin-bottom: 18px; }
   .share-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--border); color: var(--text-muted); font-family: inherit; font-size: 12px; padding: 6px 12px; border-radius: 20px; cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease; }
   .share-btn:hover { border-color: var(--teal-dim); color: var(--teal); }
+  .share-btn.active { color: var(--teal); border-color: var(--teal-dim); background: rgba(45,212,191,0.08); }
   .share-menu {
     position: absolute; top: calc(100% + 6px); left: 0; min-width: 160px; background: var(--surface-2);
     border: 1px solid var(--border); border-radius: 6px; overflow: hidden; display: none; z-index: 20;
@@ -165,9 +193,15 @@
 <header>
   <div class="wrap">
     <div class="name" onclick="showView('home')">House<span class="lights">lights</span></div>
-    <div class="search-wrap">
-      <input class="search" id="searchInput" placeholder="Search a film" oninput="onSearch(this.value)" onfocus="onSearch(this.value)">
-      <div class="dropdown" id="dropdown"></div>
+    <div class="header-controls">
+      <div class="search-wrap">
+        <input class="search" id="searchInput" placeholder="Search a film" oninput="onSearch(this.value)" onfocus="onSearch(this.value)">
+        <div class="dropdown" id="dropdown"></div>
+      </div>
+      <div class="auth-wrap" id="authWrap" style="display:none">
+        <button class="auth-btn" id="authBtn" onclick="toggleAuthMenu(event)">Sign in</button>
+        <div class="auth-menu" id="authMenu"></div>
+      </div>
     </div>
   </div>
 </header>
@@ -242,16 +276,22 @@
       <div>
         <div class="meta-line" id="movieMeta"></div>
         <h1 class="title" id="movieTitle"></h1>
-        <div class="share-wrap">
-          <button class="share-btn" id="shareBtn" onclick="toggleShareMenu(event)">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-            <span id="shareBtnLabel">Share</span>
-          </button>
-          <div class="share-menu" id="shareMenu">
-            <div class="share-menu-item" onclick="shareTo('whatsapp')">WhatsApp</div>
-            <div class="share-menu-item" onclick="shareTo('line')">LINE</div>
-            <div class="share-menu-item" onclick="shareTo('x')">X (Twitter)</div>
-            <div class="share-menu-item" onclick="shareTo('copy')">Copy link</div>
+        <div class="action-row">
+          <div class="share-wrap">
+            <button class="share-btn" id="shareBtn" onclick="toggleShareMenu(event)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+              <span id="shareBtnLabel">Share</span>
+            </button>
+            <div class="share-menu" id="shareMenu">
+              <div class="share-menu-item" onclick="shareTo('whatsapp')">WhatsApp</div>
+              <div class="share-menu-item" onclick="shareTo('line')">LINE</div>
+              <div class="share-menu-item" onclick="shareTo('x')">X (Twitter)</div>
+              <div class="share-menu-item" onclick="shareTo('copy')">Copy link</div>
+            </div>
+          </div>
+          <div class="journal-actions" id="journalActions" style="display:none">
+            <button class="share-btn" id="watchedBtn" onclick="toggleWatched()">Mark as watched</button>
+            <button class="share-btn" id="watchlistBtn" onclick="toggleWatchlist()">Add to watchlist</button>
           </div>
         </div>
         <div class="score"><b id="scoreValue">&mdash;</b> IMDb<span class="score-note" id="scoreNote"></span></div>
@@ -270,6 +310,22 @@
     </div>
   </div>
 
+  <!-- JOURNAL (template, filled by renderJournal) -->
+  <div class="view" id="view-journal">
+    <h2 class="section-title" style="font-size:22px;">My Journal</h2>
+    <div id="journalSignedOut" style="display:none">
+      <p class="country-context">Sign in to keep track of what you've watched and what you want to watch.</p>
+    </div>
+    <div id="journalSignedIn" style="display:none">
+      <div class="tabs" data-scope="journal">
+        <button class="tab active" data-group="watched" onclick="switchTab('journal','watched',this)">Watched</button>
+        <button class="tab" data-group="watchlist" onclick="switchTab('journal','watchlist',this)">Want to watch</button>
+      </div>
+      <div class="list-panel show" data-scope="journal" data-group="watched" id="panel-journal-watched"></div>
+      <div class="list-panel" data-scope="journal" data-group="watchlist" id="panel-journal-watchlist"></div>
+    </div>
+  </div>
+
 </main>
 
 <footer>
@@ -284,6 +340,7 @@
   function urlForView(name, slug) {
     if (name === 'country') return '/country/' + encodeURIComponent(slug);
     if (name === 'movie') return '/movie/' + encodeURIComponent(slug);
+    if (name === 'journal') return '/journal';
     return '/';
   }
 
@@ -293,6 +350,7 @@
     if (countryMatch) return { name: 'country', slug: decodeURIComponent(countryMatch[1]) };
     var movieMatch = path.match(/^\/movie\/([^\/]+)$/);
     if (movieMatch) return { name: 'movie', slug: decodeURIComponent(movieMatch[1]) };
+    if (path === '/journal') return { name: 'journal', slug: null };
     return { name: 'home', slug: null };
   }
 
@@ -303,6 +361,7 @@
     window.scrollTo(0,0);
     if (name === 'country') renderCountry(slug);
     if (name === 'movie') renderMovie(slug);
+    if (name === 'journal') renderJournal();
 
     if (!isRestoringHistory) {
       history.pushState({ name: name, slug: slug }, '', urlForView(name, slug));
@@ -319,6 +378,179 @@
     document.querySelectorAll('.tabs[data-scope="'+scope+'"] .tab').forEach(function(b){ b.classList.toggle('active', b===el); });
     document.querySelectorAll('.list-panel[data-scope="'+scope+'"]').forEach(function(p){ p.classList.toggle('show', p.getAttribute('data-group')===group); });
   }
+
+  // ---- Journal (Supabase accounts + watched/watchlist) ----
+  // Every table this talks to is locked down with Postgres Row Level Security, scoped to
+  // auth.uid() — see supabase/schema.sql — so it's safe for the browser to read/write
+  // Supabase directly with the public anon key, no Express route in between.
+  var supabaseClient = null;
+  var currentSession = null;
+  var currentMovieRef = null; // { slug, tmdb_id, title, year, country, poster_url, budget, box_office }
+
+  function initSupabase() {
+    if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY || !window.supabase) return; // not configured yet — auth stays hidden
+    supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    document.getElementById('authWrap').style.display = '';
+    supabaseClient.auth.onAuthStateChange(function(_event, session){
+      currentSession = session;
+      renderAuthUI();
+      refreshJournalButtonState();
+      if (document.getElementById('view-journal').classList.contains('show')) renderJournal();
+    });
+    supabaseClient.auth.getSession().then(function(res){
+      currentSession = res.data.session;
+      renderAuthUI();
+      refreshJournalButtonState();
+    });
+  }
+
+  function renderAuthUI() {
+    var btn = document.getElementById('authBtn');
+    var menu = document.getElementById('authMenu');
+    if (currentSession) {
+      var meta = currentSession.user.user_metadata || {};
+      btn.textContent = meta.full_name || currentSession.user.email || 'Account';
+      btn.classList.add('signed-in');
+      menu.innerHTML =
+        '<div class="auth-menu-item" onclick="showView(\'journal\')">My Journal</div>' +
+        '<div class="auth-menu-item" onclick="signOut()">Sign out</div>';
+    } else {
+      btn.textContent = 'Sign in';
+      btn.classList.remove('signed-in');
+      menu.innerHTML =
+        '<div class="auth-menu-item" onclick="signInWithGoogle()">Continue with Google</div>' +
+        '<div class="auth-menu-divider">or</div>' +
+        '<div class="auth-menu-email">' +
+          '<input type="email" id="magicLinkEmail" placeholder="you@email.com">' +
+          '<button onclick="sendMagicLink()">Email me a sign-in link</button>' +
+        '</div>';
+    }
+  }
+  function toggleAuthMenu(e) {
+    e.stopPropagation();
+    document.getElementById('authMenu').classList.toggle('show');
+  }
+  document.addEventListener('click', function(e){
+    if (!e.target.closest('.auth-wrap')) {
+      var menu = document.getElementById('authMenu');
+      if (menu) menu.classList.remove('show');
+    }
+  });
+  function signInWithGoogle() {
+    if (!supabaseClient) return;
+    supabaseClient.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } });
+  }
+  function sendMagicLink() {
+    if (!supabaseClient) return;
+    var input = document.getElementById('magicLinkEmail');
+    var email = input && input.value.trim();
+    if (!email) return;
+    supabaseClient.auth.signInWithOtp({ email: email, options: { emailRedirectTo: window.location.href } })
+      .then(function(res){
+        var menu = document.getElementById('authMenu');
+        menu.innerHTML = '<div class="auth-menu-note">' +
+          (res.error ? res.error.message : 'Check ' + email + ' for a sign-in link.') +
+          '</div>';
+      });
+  }
+  function signOut() {
+    if (!supabaseClient) return;
+    supabaseClient.auth.signOut();
+  }
+
+  function setCurrentMovieRef(ref) {
+    currentMovieRef = ref;
+    refreshJournalButtonState();
+  }
+
+  function refreshJournalButtonState() {
+    var actions = document.getElementById('journalActions');
+    if (!actions) return;
+    if (!currentSession || !currentMovieRef) { actions.style.display = 'none'; return; }
+    actions.style.display = '';
+    var watchedBtn = document.getElementById('watchedBtn');
+    var watchlistBtn = document.getElementById('watchlistBtn');
+    watchedBtn.classList.remove('active'); watchedBtn.textContent = 'Mark as watched';
+    watchlistBtn.classList.remove('active'); watchlistBtn.textContent = 'Add to watchlist';
+    var slug = currentMovieRef.slug;
+    supabaseClient.from('watched_entries').select('id').eq('user_id', currentSession.user.id).eq('movie_slug', slug).maybeSingle()
+      .then(function(res){
+        if (res.data && currentMovieRef && currentMovieRef.slug === slug) { watchedBtn.classList.add('active'); watchedBtn.textContent = '✓ Watched'; }
+      });
+    supabaseClient.from('watchlist_entries').select('id').eq('user_id', currentSession.user.id).eq('movie_slug', slug).maybeSingle()
+      .then(function(res){
+        if (res.data && currentMovieRef && currentMovieRef.slug === slug) { watchlistBtn.classList.add('active'); watchlistBtn.textContent = '✓ In watchlist'; }
+      });
+  }
+
+  function toggleWatched() {
+    if (!supabaseClient || !currentSession || !currentMovieRef) return;
+    var btn = document.getElementById('watchedBtn');
+    if (btn.classList.contains('active')) {
+      supabaseClient.from('watched_entries').delete().eq('user_id', currentSession.user.id).eq('movie_slug', currentMovieRef.slug)
+        .then(function(){ btn.classList.remove('active'); btn.textContent = 'Mark as watched'; });
+    } else {
+      var row = {
+        user_id: currentSession.user.id, movie_slug: currentMovieRef.slug, tmdb_id: currentMovieRef.tmdb_id,
+        title: currentMovieRef.title, year: currentMovieRef.year, country: currentMovieRef.country,
+        poster_url: currentMovieRef.poster_url, budget: currentMovieRef.budget, box_office: currentMovieRef.box_office
+      };
+      supabaseClient.from('watched_entries').upsert(row, { onConflict: 'user_id,movie_slug' })
+        .then(function(res){ if (!res.error) { btn.classList.add('active'); btn.textContent = '✓ Watched'; } });
+    }
+  }
+  function toggleWatchlist() {
+    if (!supabaseClient || !currentSession || !currentMovieRef) return;
+    var btn = document.getElementById('watchlistBtn');
+    if (btn.classList.contains('active')) {
+      supabaseClient.from('watchlist_entries').delete().eq('user_id', currentSession.user.id).eq('movie_slug', currentMovieRef.slug)
+        .then(function(){ btn.classList.remove('active'); btn.textContent = 'Add to watchlist'; });
+    } else {
+      var row = {
+        user_id: currentSession.user.id, movie_slug: currentMovieRef.slug, tmdb_id: currentMovieRef.tmdb_id,
+        title: currentMovieRef.title, year: currentMovieRef.year, country: currentMovieRef.country,
+        poster_url: currentMovieRef.poster_url
+      };
+      supabaseClient.from('watchlist_entries').upsert(row, { onConflict: 'user_id,movie_slug' })
+        .then(function(res){ if (!res.error) { btn.classList.add('active'); btn.textContent = '✓ In watchlist'; } });
+    }
+  }
+
+  function journalRowHTML(entry) {
+    return '<div class="film-row clickable" onclick="showView(\'movie\',\''+entry.movie_slug+'\')">'+
+      '<div class="row-poster" style="'+(entry.poster_url ? 'background-image:url('+entry.poster_url+')' : '')+'"></div>'+
+      '<div class="info"><div class="t">'+entry.title+'</div>'+
+        '<div class="y">'+(entry.year || '')+(entry.country ? ' · '+entry.country : '')+'</div>'+
+      '</div></div>';
+  }
+
+  function renderJournal() {
+    var signedOut = document.getElementById('journalSignedOut');
+    var signedIn = document.getElementById('journalSignedIn');
+    if (!currentSession) {
+      signedOut.style.display = '';
+      signedIn.style.display = 'none';
+      return;
+    }
+    signedOut.style.display = 'none';
+    signedIn.style.display = '';
+    var watchedPanel = document.getElementById('panel-journal-watched');
+    var watchlistPanel = document.getElementById('panel-journal-watchlist');
+    watchedPanel.innerHTML = '<div class="gap-note">Loading…</div>';
+    watchlistPanel.innerHTML = '<div class="gap-note">Loading…</div>';
+    supabaseClient.from('watched_entries').select('*').eq('user_id', currentSession.user.id).order('watched_date', { ascending: false })
+      .then(function(res){
+        var rows = res.data || [];
+        watchedPanel.innerHTML = rows.length ? rows.map(journalRowHTML).join('') : '<div class="gap-note">Nothing marked as watched yet.</div>';
+      });
+    supabaseClient.from('watchlist_entries').select('*').eq('user_id', currentSession.user.id).order('added_at', { ascending: false })
+      .then(function(res){
+        var rows = res.data || [];
+        watchlistPanel.innerHTML = rows.length ? rows.map(journalRowHTML).join('') : '<div class="gap-note">Nothing on your watchlist yet.</div>';
+      });
+  }
+
+  initSupabase();
 
   function movieLink(item, kind) {
     if (item.link) return item.link;
@@ -562,7 +794,8 @@
   }
 
   function renderMovie(slug) {
-    if (movies[slug]) { renderCuratedMovie(movies[slug]); return; }
+    setCurrentMovieRef(null); // reset so a previous page's watched/watchlist state doesn't flash
+    if (movies[slug]) { renderCuratedMovie(movies[slug], slug); return; }
     if (!slug) return;
     if (slug.indexOf('tmdb:') === 0) { renderGenericMovie({ id: slug.slice(5) }); return; }
     if (slug.indexOf('title:') === 0) {
@@ -575,7 +808,8 @@
     }
   }
 
-  function renderCuratedMovie(m) {
+  function renderCuratedMovie(m, slug) {
+    setCurrentMovieRef({ slug: slug, tmdb_id: null, title: m.title, year: m.year, country: m.country, poster_url: null, budget: null, box_office: null });
     document.getElementById('movieCrumbs').innerHTML =
       '<a onclick="showView(\'home\')">Houselights</a> / ' +
       '<a onclick="showView(\'country\',\''+m.countrySlug+'\')">'+m.country+'</a> / ' +
@@ -624,6 +858,7 @@
           posterEl.style.backgroundSize = 'cover';
           posterEl.style.backgroundPosition = 'center';
           noteEl.style.display = 'none';
+          if (currentMovieRef && currentMovieRef.title === movie.title) currentMovieRef.poster_url = data.poster.url;
         } else if (data.poster) {
           noteEl.style.display = '';
           noteEl.textContent = 'Poster art placeholder — ' + data.poster.reason;
@@ -687,6 +922,14 @@
         var heading = displayTitle || t.title;
         var country = t.country || 'Unknown';
         var countrySlug = countrySlugByName(country);
+        // Canonicalize to a tmdb: slug whenever we have a real TMDB id, even if this page
+        // was reached via a title:-slug link — keeps the same film from creating two
+        // separate journal rows depending on which link happened to be clicked.
+        setCurrentMovieRef({
+          slug: t.id ? ('tmdb:' + t.id) : (query.id ? ('tmdb:' + query.id) : ('title:' + encodeURIComponent(t.title) + '|' + (t.year || ''))),
+          tmdb_id: t.id || null, title: t.title, year: t.year, country: t.country,
+          poster_url: t.posterUrl || null, budget: t.budget || null, box_office: t.revenue || null
+        });
         document.getElementById('movieCrumbs').innerHTML =
           '<a onclick="showView(\'home\')">Houselights</a> / ' +
           (countrySlug ? '<a onclick="showView(\'country\',\''+countrySlug+'\')">'+country+'</a> / ' : country + ' / ') +
