@@ -224,9 +224,11 @@
     <div class="tabs" data-scope="country">
       <button class="tab active" data-group="box" onclick="switchTab('country','box',this)">Box office leaders</button>
       <button class="tab" data-group="recognized" onclick="switchTab('country','recognized',this)">Internationally recognized</button>
+      <button class="tab" data-group="imdb" onclick="switchTab('country','imdb',this)">Highest IMDb rated</button>
     </div>
     <div class="list-panel show" data-scope="country" data-group="box" id="panel-country-box"></div>
     <div class="list-panel" data-scope="country" data-group="recognized" id="panel-country-recognized"></div>
+    <div class="list-panel" data-scope="country" data-group="imdb" id="panel-country-imdb"></div>
   </div>
 
   <!-- MOVIE (template, filled by renderMovie) -->
@@ -379,13 +381,13 @@
         if (data.reason) {
           panel.insertAdjacentHTML('beforeend', '<div class="gap-note">'+data.reason+'</div>');
         } else if (!data.results || !data.results.length) {
-          // This fetched page had nothing clear 7.0 — treat as the real end rather than
+          // This fetched page had nothing clear 6.0 — treat as the real end rather than
           // keep offering "View more" just because TMDB still has more raw pages.
-          panel.insertAdjacentHTML('beforeend', '<div class="gap-note">Sourced from TMDB’s top-rated catalog (1,000+ votes), cross-checked against real IMDb scores — only titles that clear 7.0 are shown.</div>');
+          panel.insertAdjacentHTML('beforeend', '<div class="gap-note">Sourced from TMDB’s top-rated catalog (1,000+ votes), cross-checked against real IMDb scores — only titles that clear 6.0 are shown.</div>');
         } else if (data.page < data.totalPages) {
           panel.insertAdjacentHTML('beforeend', '<div class="view-more" onclick="loadMoreImdb()">View more</div>');
         } else {
-          panel.insertAdjacentHTML('beforeend', '<div class="gap-note">Sourced from TMDB’s top-rated catalog (1,000+ votes), cross-checked against real IMDb scores — only titles that clear 7.0 are shown.</div>');
+          panel.insertAdjacentHTML('beforeend', '<div class="gap-note">Sourced from TMDB’s top-rated catalog (1,000+ votes), cross-checked against real IMDb scores — only titles that clear 6.0 are shown.</div>');
         }
         imdbLoading = false;
       })
@@ -406,6 +408,54 @@
     var existingMore = panel.querySelector('.view-more');
     if (existingMore) existingMore.remove();
     loadTopImdb(false);
+  }
+
+  var countryImdbPage = 1;
+  var countryImdbLoading = false;
+  var countryImdbResults = [];
+  var countryImdbSlug = null;
+  function loadCountryImdb(slug, reset) {
+    if (countryImdbLoading) return;
+    countryImdbLoading = true;
+    if (reset) { countryImdbPage = 1; countryImdbResults = []; countryImdbSlug = slug; }
+    var panel = document.getElementById('panel-country-imdb');
+    if (reset) panel.innerHTML = '<div class="gap-note">Loading…</div>';
+    fetch('/api/top-imdb?country=' + encodeURIComponent(slug) + '&page=' + countryImdbPage)
+      .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(data){
+        if (slug !== countryImdbSlug) return; // user switched countries before this resolved
+        countryImdbResults = countryImdbResults.concat(data.results || []);
+        countryImdbResults.sort(function(a,b){ return parseFloat(b.imdbRating) - parseFloat(a.imdbRating); });
+        panel.innerHTML = countryImdbResults.map(imdbRowHTML).join('');
+        if (data.reason) {
+          panel.insertAdjacentHTML('beforeend', '<div class="gap-note">'+data.reason+'</div>');
+        } else if (!data.results || !data.results.length) {
+          panel.insertAdjacentHTML('beforeend', '<div class="gap-note">Sourced from TMDB’s catalog for this country (50+ votes), cross-checked against real IMDb scores — only titles that clear 6.0 are shown.</div>');
+        } else if (data.page < data.totalPages) {
+          panel.insertAdjacentHTML('beforeend', '<div class="view-more" onclick="loadMoreCountryImdb()">View more</div>');
+        } else {
+          panel.insertAdjacentHTML('beforeend', '<div class="gap-note">Sourced from TMDB’s catalog for this country (50+ votes), cross-checked against real IMDb scores — only titles that clear 6.0 are shown.</div>');
+        }
+        countryImdbLoading = false;
+      })
+      .catch(function(){
+        countryImdbLoading = false;
+        if (slug !== countryImdbSlug) return;
+        panel.insertAdjacentHTML('beforeend', '<div class="view-more" onclick="retryCountryImdb()">Couldn’t load more — tap to retry</div>');
+      });
+  }
+  function loadMoreCountryImdb() {
+    var panel = document.getElementById('panel-country-imdb');
+    var existingMore = panel.querySelector('.view-more');
+    if (existingMore) existingMore.remove();
+    countryImdbPage++;
+    loadCountryImdb(countryImdbSlug, false);
+  }
+  function retryCountryImdb() {
+    var panel = document.getElementById('panel-country-imdb');
+    var existingMore = panel.querySelector('.view-more');
+    if (existingMore) existingMore.remove();
+    loadCountryImdb(countryImdbSlug, false);
   }
 
   function renderList(id, items, gapNote, limit, kind) {
@@ -506,6 +556,7 @@
     document.getElementById('countryContext').textContent = c.context;
     renderList('panel-country-box', c.box, c.boxGapNote, 20, 'box');
     renderList('panel-country-recognized', c.recognized, c.recognizedGapNote, 20, 'recognized');
+    loadCountryImdb(slug, true);
     document.querySelectorAll('.tabs[data-scope="country"] .tab').forEach(function(t,i){ t.classList.toggle('active', i===0); });
     document.querySelectorAll('.list-panel[data-scope="country"]').forEach(function(p){ p.classList.toggle('show', p.getAttribute('data-group')==='box'); });
   }
@@ -1310,7 +1361,7 @@
       countries[slug].recognized.map(function(i){ return {i:i, kind:'recognized'}; })
     );
   }, data.globalBox.map(function(i){ return {i:i, kind:'box'}; }).concat(data.globalImdb.map(function(i){ return {i:i, kind:'box'}; })))
-    .map(function(x){ return {t:x.i.t, link:movieLink(x.i, x.kind)}; })
+    .map(function(x){ return {t:x.i.t, y:x.i.y, link:movieLink(x.i, x.kind)}; })
     .filter(function(v,i,arr){ return arr.findIndex(function(x){return x.t===v.t;})===i; });
 
   function findCuratedSlugByTitle(title) {
@@ -1337,8 +1388,11 @@
       // Curated matches are enriched by looking each one up directly by its own title —
       // relying on them showing up in the general search below isn't reliable, since TMDB's
       // relevance ranking for the raw query text won't always surface them in the top few.
+      // The year is passed along too, since an unqualified title can be ambiguous (e.g.
+      // "Taxi" also matching the 1976 "Taxi Driver", a totally different film).
       var curatedEnrichPromise = Promise.all(curatedMatches.map(function(c){
-        return fetch('/api/movie-details?title=' + encodeURIComponent(c.t))
+        var yearParam = /^\d{4}$/.test(String(c.y)) ? '&year=' + c.y : '';
+        return fetch('/api/movie-details?title=' + encodeURIComponent(c.t) + yearParam)
           .then(function(r){ return r.json(); })
           .then(function(data){
             var t = data.tmdb;
