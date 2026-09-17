@@ -243,7 +243,8 @@ async function getTmdbDetails(id) {
     revenue: t.revenue || 0,
     country,
     director: director ? director.name : null,
-    cast: cast.slice(0, 3).map((c) => c.name),
+    cast: cast.slice(0, 5).map((c) => c.name),
+    runtimeMinutes: t.runtime || null,
     imdbId: (t.external_ids && t.external_ids.imdb_id) || null
   };
   cache.set(cacheKey, result);
