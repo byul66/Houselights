@@ -1697,7 +1697,11 @@
     isRestoringHistory = true;
     showView(initial.name, initial.slug);
     isRestoringHistory = false;
-    history.replaceState({ name: initial.name, slug: initial.slug }, '', urlForView(initial.name, initial.slug));
+    // Preserve any existing query string/hash (e.g. Supabase's OAuth "?code=..." or
+    // "#access_token=..." redirect) rather than wiping it — supabase-js reads it
+    // asynchronously right after createClient() runs, and this replaceState would
+    // otherwise strip it out from under that read before it gets a chance to run.
+    history.replaceState({ name: initial.name, slug: initial.slug }, '', urlForView(initial.name, initial.slug) + window.location.search + window.location.hash);
   })();
 </script>
 
